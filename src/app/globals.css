@@ -1,4 +1,4 @@
-@tailwind base;
+/* @tailwind base; */
 @tailwind components;
 @tailwind utilities;
 
@@ -29,5 +29,14 @@ body {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+}
+@layer components {
+  .grid-container {
+    @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4;
+  }
+
+  .box {
+    @apply h-24 bg-gray-200 rounded-lg flex items-center justify-center shadow-md hover:bg-gray-300 transition-colors duration-200;
   }
 }
