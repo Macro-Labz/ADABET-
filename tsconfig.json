@@ -1,33 +1,28 @@
 {
-  "$schema": "https://json.schemastore.org/tsconfig",
-  "display": "Next.js",
   "compilerOptions": {
-    "declaration": true,
-    "declarationMap": true,
-    "esModuleInterop": true,
-    "incremental": false,
-    "isolatedModules": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "target": "ESNext",
-    "moduleDetection": "force",
-    "noUncheckedIndexedAccess": true,
-    "resolveJsonModule": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "sourceMap": true,
-    "allowSyntheticDefaultImports": true,
-    "plugins": [{ "name": "next" }],
-    "module": "ESNext",
-    "moduleResolution": "Bundler",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": true,
-    "jsx": "preserve",
+    "skipLibCheck": true,
+    "strict": false,
     "noEmit": true,
-    "noUnusedLocals": false,
-    "noImplicitAny": false
+    "incremental": true,
+    "module": "esnext",
+    "esModuleInterop": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve"
   },
-  "paths": {
-    "@/*": ["./src/*"]
-  },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
-  "exclude": ["node_modules"]
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }
