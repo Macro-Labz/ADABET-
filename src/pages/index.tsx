@@ -73,7 +73,7 @@ export default function HomePage() {
               <p className="font-bold text-base">Developer</p>
               </div>
               <div className="flex flex-col items-center">
-                <Image src="/TMMP14.png" alt="Team Member 2" width={200} height={200} className="rounded-lg mb-4" />
+                <Image src="/MMP1.png" alt="Team Member 2" width={200} height={200} className="rounded-lg mb-4" />
                 <p className="font-bold mb-2 text-xl">Tha MacroMan</p>
                 <p className="font-bold mb-2 text-base">@ThaMacroMan</p>
                 <p className="font-bold text-base">Developer</p>

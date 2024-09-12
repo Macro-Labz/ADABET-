@@ -82,3 +82,51 @@
     @apply h-24 bg-gray-200 rounded-lg flex items-center justify-center shadow-md hover:bg-gray-300 transition-colors duration-200;
   }
 }
+.betting-history-container {
+  max-height: 300px; /* Adjust as needed */
+  overflow-y: auto;
+  border: 1px solid #333;
+  background-color: #1a1a1a;
+}
+
+.betting-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  color: #fff;
+}
+
+.betting-history-table th,
+.betting-history-table td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid #333;
+}
+
+.betting-history-table th {
+  background-color: #2a2a2a;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.betting-history-table tbody tr:hover {
+  background-color: #2a2a2a;
+}
+
+/* Customize scrollbar */
+.betting-history-container::-webkit-scrollbar {
+  width: 10px;
+}
+
+.betting-history-container::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+.betting-history-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 5px;
+}
+
+.betting-history-container::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}

@@ -127,20 +127,50 @@ const ProfilePage: React.FC = () => {
         <div className="container mx-auto px-4 mt-8 flex justify-center">
           <div className="w-[800px] h-[400px] bg-gray-900 rounded-lg shadow-lg p-4 flex items-center justify-center">
             {/* Graph component */}
-            <div className="w-[95%] h-[95%]">
+            <div className="w-[100%] h-[102%]">
               <Graph />
             </div>
           </div>
         </div>
 
-        {/* Single Box Banner */}
-        <div className="bg-gray-900 flex-grow mt-8">
-          <div className="container mx-auto h-full">
-            <div className="grid grid-cols-1 gap-4 text-sm h-full">
-              <div className="bg-gray-800 p-2 rounded">
-                <div className="font-bold">Betting History</div>
-                <div>Content goes here</div>
-              </div>
+        {/* Betting History Box */}
+        <div className="w-full mt-8 flex-grow flex flex-col bg-gray-900">
+          <div className="container mx-auto px-4 py-4 flex flex-col h-[400px]"> {/* Set a fixed height */}
+            <h2 className="text-xl font-bold mb-4">Betting History</h2>
+            <div className="overflow-y-auto flex-grow">
+              <table className="w-full">
+                <thead className="bg-black sticky top-0"> {/* Make header sticky */}
+                  <tr>
+                    <th className="py-2 px-4 text-left">BET - ID</th>
+                    <th className="py-2 px-4 text-left">Amount</th>
+                    <th className="py-2 px-4 text-left">Odds</th>
+                    <th className="py-2 px-4 text-left">Result</th>
+                    <th className="py-2 px-4 text-left">Profit/Loss</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...Array(10)].map((_, index) => {
+                    const profitLoss = index % 3 === 0 ? '+50' : index % 3 === 1 ? '0' : '-100';
+                    const profitLossColor = 
+                      profitLoss.startsWith('+') ? 'text-green-500' :
+                      profitLoss.startsWith('-') ? 'text-red-500' : 'text-blue-500';
+                    
+                    return (
+                      <tr key={index} className="bg-black border-b border-gray-700">
+                        <td className="py-2 px-4">BET-{1000 + index}</td>
+                        <td className="py-2 px-4 text-blue-500">100 ADA</td>
+                        <td className="py-2 px-4">1.5</td>
+                        <td className={`py-2 px-4 ${index % 2 === 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {index % 2 === 0 ? 'Win' : 'Loss'}
+                        </td>
+                        <td className={`py-2 px-4 ${profitLossColor}`}>
+                          {profitLoss} ADA
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
