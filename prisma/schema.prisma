@@ -1,0 +1,40 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String   @id @default(cuid())
+  address            String   @unique
+  activeBets         Int      @default(0)
+  winningBets        Int      @default(0)
+  losingBets         Int      @default(0)
+  lifetimeProfitLoss Float    @default(0)
+  totalBets          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  bets     Bet[]
+}
+
+model Bet {
+  id          String   @id @default(cuid())
+  userAddress String
+  user        User     @relation(fields: [userAddress], references: [address])
+  amount      Float
+  odds        Float
+  result      String   // "win" or "loss"
+  profitLoss  Float
+  createdAt   DateTime @default(now())
+
+  @@index([userAddress])
+}

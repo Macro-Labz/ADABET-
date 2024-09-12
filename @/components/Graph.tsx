@@ -1,12 +1,11 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, CartesianGrid, Tooltip } from 'recharts';
 
-const data = Array.from({ length: 10 }, (_, i) => ({
-  date: new Date(2024, 0, i + 1).toISOString().split('T')[0],
-  value: 100 + i * 100
-}));
+interface GraphProps {
+  data: { date: string; value: number }[];
+}
 
-const Graph: React.FC = () => {
+const Graph: React.FC<GraphProps> = ({ data }) => {
   return (
     <ResponsiveContainer width="100%" height={400}>
       <LineChart data={data}>
@@ -15,13 +14,13 @@ const Graph: React.FC = () => {
         <YAxis 
           tick={{ fill: '#888888' }} 
           axisLine={{ stroke: '#333333' }}
-          domain={[0, 1000]}
+          domain={['auto', 'auto']}
           tickFormatter={(value) => `${value}`}
         />
         <Tooltip 
           contentStyle={{ backgroundColor: '#1a1a1a', border: 'none' }}
           labelStyle={{ color: '#888888' }}
-          formatter={(value: number) => [`${value} ADA`, 'Value']}
+          formatter={(value: number) => [`${value} ADA`, 'Profit/Loss']}
         />
         <Line 
           type="monotone" 

@@ -48,7 +48,7 @@ export default function HomePage() {
 
           <main className={`flex-grow flex flex-col items-center justify-center p-24 ${inter.className}`}>
             <BlurIn
-              word="Welcome to ADA BETS"
+              word="Welcome to ADA BET$ "
               className="mb-8 text-6xl font-bold text-blue-600"
               duration={1.5}
             />

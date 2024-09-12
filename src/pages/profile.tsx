@@ -6,6 +6,8 @@ import { useWallet } from "@meshsdk/react";
 import Header from '../../@/components/Header';
 import { GridPattern } from '../../@/components/magicui/animated-grid-pattern';
 import Graph from '../../@/components/Graph';
+import axios from 'axios';
+import { format, subDays } from 'date-fns';
 
 const ProfilePage: React.FC = () => {
   const { connected, wallet } = useWallet();
@@ -15,14 +17,17 @@ const ProfilePage: React.FC = () => {
   const [winningBets, setWinningBets] = useState<number>(0);
   const [losingBets, setLosingBets] = useState<number>(0);
   const [lifetimeProfitLoss, setLifetimeProfitLoss] = useState<number>(0);
+  const [totalBets, setTotalBets] = useState<number>(0);
+  const [profitLossData, setProfitLossData] = useState<{ date: string; value: number }[]>([]);
+  const [bettingHistory, setBettingHistory] = useState<any[]>([]);
 
   useEffect(() => {
     if (!connected) {
       router.push('/');
     } else {
       fetchBalance();
-      fetchActiveBets();
-      fetchBetStats(); // New function to fetch bet statistics
+      fetchUserData();
+      fetchBettingHistory();
     }
   }, [connected, router, wallet]);
 
@@ -35,18 +40,45 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  const fetchActiveBets = async () => {
-    // TODO: Replace this with actual API call or data fetching logic
-    // For now, we'll use a mock value
-    setActiveBets(3); // Example: User has 3 active bets
+  const fetchUserData = async () => {
+    if (wallet) {
+      try {
+        const addresses = await wallet.getUsedAddresses();
+        const address = addresses[0]; // Use the first address
+        const response = await axios.get(`/api/user/${address}`);
+        const userData = response.data;
+        setActiveBets(userData.activeBets);
+        setWinningBets(userData.winningBets);
+        setLosingBets(userData.losingBets);
+        setLifetimeProfitLoss(userData.lifetimeProfitLoss);
+        setTotalBets(userData.totalBets);
+      } catch (error) {
+        console.error('Error fetching user data:', error);
+      }
+    }
   };
 
-  const fetchBetStats = async () => {
-    // TODO: Replace this with actual API call or data fetching logic
-    // For now, we'll use mock values
-    setWinningBets(7); // Example: User has 7 winning bets
-    setLosingBets(3); // Example: User has 3 losing bets
-    setLifetimeProfitLoss(1500); // Example: User has a profit of 1500 ADA
+  const fetchBettingHistory = async () => {
+    if (wallet) {
+      try {
+        const addresses = await wallet.getUsedAddresses();
+        const address = addresses[0];
+        const response = await axios.get(`/api/user/${address}/profit-loss`);
+        const data = response.data;
+        
+        setBettingHistory(data);
+        
+        // Transform the data for the graph
+        const graphData = data.map((item: any) => ({
+          date: item.date,
+          value: item.profitLoss
+        }));
+        
+        setProfitLossData(graphData);
+      } catch (error) {
+        console.error('Error fetching betting history data:', error);
+      }
+    }
   };
 
   const calculateWinLossRatio = (): { ratio: string; color: string } => {
@@ -128,18 +160,18 @@ const ProfilePage: React.FC = () => {
           <div className="w-[800px] h-[400px] bg-gray-900 rounded-lg shadow-lg p-4 flex items-center justify-center">
             {/* Graph component */}
             <div className="w-[100%] h-[102%]">
-              <Graph />
+              <Graph data={profitLossData} />
             </div>
           </div>
         </div>
 
         {/* Betting History Box */}
         <div className="w-full mt-8 flex-grow flex flex-col bg-gray-900">
-          <div className="container mx-auto px-4 py-4 flex flex-col h-[400px]"> {/* Set a fixed height */}
+          <div className="container mx-auto px-4 py-4 flex flex-col h-[400px]">
             <h2 className="text-xl font-bold mb-4">Betting History</h2>
             <div className="overflow-y-auto flex-grow">
               <table className="w-full">
-                <thead className="bg-black sticky top-0"> {/* Make header sticky */}
+                <thead className="bg-black sticky top-0">
                   <tr>
                     <th className="py-2 px-4 text-left">BET - ID</th>
                     <th className="py-2 px-4 text-left">Amount</th>
@@ -149,22 +181,21 @@ const ProfilePage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...Array(10)].map((_, index) => {
-                    const profitLoss = index % 3 === 0 ? '+50' : index % 3 === 1 ? '0' : '-100';
+                  {bettingHistory.map((bet) => {
                     const profitLossColor = 
-                      profitLoss.startsWith('+') ? 'text-green-500' :
-                      profitLoss.startsWith('-') ? 'text-red-500' : 'text-blue-500';
+                      bet.profitLoss > 0 ? 'text-green-500' :
+                      bet.profitLoss < 0 ? 'text-red-500' : 'text-blue-500';
                     
                     return (
-                      <tr key={index} className="bg-black border-b border-gray-700">
-                        <td className="py-2 px-4">BET-{1000 + index}</td>
-                        <td className="py-2 px-4 text-blue-500">100 ADA</td>
-                        <td className="py-2 px-4">1.5</td>
-                        <td className={`py-2 px-4 ${index % 2 === 0 ? 'text-green-500' : 'text-red-500'}`}>
-                          {index % 2 === 0 ? 'Win' : 'Loss'}
+                      <tr key={bet.id} className="bg-black border-b border-gray-700">
+                        <td className="py-2 px-4">BET-{bet.id}</td>
+                        <td className="py-2 px-4 text-blue-500">{bet.amount} ADA</td>
+                        <td className="py-2 px-4">{bet.odds}</td>
+                        <td className={`py-2 px-4 ${bet.result === 'win' ? 'text-green-500' : 'text-red-500'}`}>
+                          {bet.result === 'win' ? 'Win' : 'Loss'}
                         </td>
                         <td className={`py-2 px-4 ${profitLossColor}`}>
-                          {profitLoss} ADA
+                          {formatProfitLoss(bet.profitLoss)} ADA
                         </td>
                       </tr>
                     );
