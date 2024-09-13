@@ -8,14 +8,28 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      const { data: predictions, error } = await supabase
+      // Fetch predictions
+      const { data: predictions, error: predictionsError } = await supabase
         .from('predictions')
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (predictionsError) throw predictionsError;
 
-      res.status(200).json({ status: 'success', predictions });
+      // Fetch bets for all predictions
+      const { data: bets, error: betsError } = await supabase
+        .from('bets')
+        .select('*');
+
+      if (betsError) throw betsError;
+
+      // Combine predictions with their bets
+      const predictionsWithBets = predictions.map(prediction => ({
+        ...prediction,
+        bets: bets.filter(bet => bet.prediction_id === prediction.id)
+      }));
+
+      res.status(200).json({ status: 'success', predictions: predictionsWithBets });
     } catch (error: any) {
       console.error('Error fetching predictions:', error);
       res.status(500).json({ status: 'error', message: error.message || 'Failed to fetch predictions' });

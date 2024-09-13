@@ -4,16 +4,17 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'r
 
 interface Bet {
   id: number;
-  user: string;
+  prediction_id: number;
+  user_wallet_address?: string;
   amount: number;
-  type: 'yes' | 'no';
-  timestamp: string;
+  bet_type: 'yes' | 'no';
+  created_at: string;
 }
 
 interface Comment {
   id: number;
   user: string;
-  text: string;
+  content: string;
   timestamp: string;
   upvotes: number;
   downvotes: number;
@@ -36,7 +37,7 @@ interface PredictionDetailsProps {
   onBet: (predictionId: number, betType: 'yes' | 'no', amount: number) => void;
   onAddComment: (predictionId: number, commentContent: string) => void;
   onVoteComment: (predictionId: number, commentId: number, voteType: 'up' | 'down') => void;
-  currentUser: string;
+  wallet: any;
 }
 
 const PredictionDetails: React.FC<PredictionDetailsProps> = ({ 
@@ -45,25 +46,27 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   onBet, 
   onAddComment, 
   onVoteComment,
-  currentUser
+  wallet // Make sure this prop is passed from the parent component
 }) => {
   const [betAmount, setBetAmount] = useState('');
-  const [chartData, setChartData] = useState<{ name: string; yes: number; no: number; }[]>([]); // Specify the type
+  const [chartData, setChartData] = useState<{ name: string; yes: number; no: number; }[]>([]);
   const [commentContent, setCommentContent] = useState('');
   const [memeUrl, setMemeUrl] = useState('');
   const [showMemeSelector, setShowMemeSelector] = useState(false);
 
-  // Mock meme/GIF data (replace with actual API call in production)
   const memeOptions = [
     { url: 'https://example.com/meme1.gif', alt: 'Funny meme 1' },
     { url: 'https://example.com/meme2.gif', alt: 'Funny meme 2' },
     { url: 'https://example.com/meme3.gif', alt: 'Funny meme 3' },
-    // Add more meme options here
   ];
 
   useEffect(() => {
     updateChartData();
   }, [prediction.yes_ada, prediction.no_ada]);
+
+  useEffect(() => {
+    console.log('Prediction bets:', prediction.bets);
+  }, [prediction.bets]);
 
   const updateChartData = () => {
     const totalAda = prediction.yes_ada + prediction.no_ada;
@@ -78,19 +81,44 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
     setChartData(prevData => {
       const updatedData = [...prevData, newDataPoint];
-      return updatedData.slice(-10); // Keep only the last 10 data points
+      return updatedData.slice(-10);
     });
   };
 
-  const handleBet = (type: 'yes' | 'no') => {
+  const handleBet = async (type: 'yes' | 'no') => {
     const amount = parseFloat(betAmount);
     if (isNaN(amount) || amount <= 0) {
       alert('Please enter a valid bet amount');
       return;
     }
-    onBet(prediction.id, type, amount);
-    setBetAmount('');
-    updateChartData();
+
+    try {
+      const walletAddress = await wallet.getChangeAddress();
+      const response = await fetch('/api/createBet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          predictionId: prediction.id,
+          userWalletAddress: walletAddress,
+          amount,
+          betType: type,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to place bet');
+      }
+
+      const data = await response.json();
+      onBet(prediction.id, type, amount);
+      setBetAmount('');
+      updateChartData();
+    } catch (error) {
+      console.error('Error placing bet:', error);
+      alert('Failed to place bet. Please try again.');
+    }
   };
 
   const handleAddComment = () => {
@@ -163,7 +191,13 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
               {prediction.bets && prediction.bets.length > 0 ? (
                 prediction.bets.map((bet) => (
                   <li key={bet.id} className="bg-gray-700 p-2 rounded">
-                    {bet.user} bet {bet.amount} ADA on {bet.type} at {bet.timestamp}
+                    {bet.user_wallet_address 
+                      ? `${bet.user_wallet_address.slice(0, 8)}...` 
+                      : 'Anonymous'} bet {bet.amount} ADA on {bet.bet_type} at {
+                        bet.created_at 
+                          ? new Date(bet.created_at).toLocaleString()
+                          : 'Unknown Date'
+                    }
                   </li>
                 ))
               ) : (
@@ -224,7 +258,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="font-semibold">{comment.user || 'Anonymous'}</p>
-                        <p>{comment.text}</p>
+                        <p>{comment.content}</p>
                         {comment.memeUrl && (
                           <img src={comment.memeUrl} alt="Meme" className="mt-2 max-w-full h-auto" />
                         )}

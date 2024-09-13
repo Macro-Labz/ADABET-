@@ -9,6 +9,7 @@ import CreateBetForm from '../components/CreateBetForm';
 import PredictionDetails from '../components/PredictionDetails';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import { useWallet } from "@meshsdk/react";
 
 // Update the Prediction interface
 interface Prediction {
@@ -26,13 +27,14 @@ interface Prediction {
   color: string;
 }
 
-// Define the Bet interface
+// Update the Bet interface
 interface Bet {
   id: number;
-  user: string;
+  prediction_id: number;
+  user_wallet_address?: string; // Make this optional
   amount: number;
-  type: 'yes' | 'no';
-  timestamp: string;
+  bet_type: 'yes' | 'no';
+  created_at: string;
 }
 
 // Update the Comment interface
@@ -58,6 +60,7 @@ const AdaBetsPage: React.FC = () => {
   const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null); // Update type to allow Prediction or null
   const [currentUser, setCurrentUser] = useState('User1'); // Simulating a logged-in user
   const router = useRouter();
+  const { connected, wallet } = useWallet();
 
   useEffect(() => {
     fetchPredictions();
@@ -109,7 +112,11 @@ const AdaBetsPage: React.FC = () => {
   };
 
   const handleCreateBet = () => {
-    setShowCreateForm(true);
+    if (connected) {
+      setShowCreateForm(true);
+    } else {
+      alert('Please connect your wallet to create a bet.');
+    }
   };
 
   const handleNewPrediction = (newPrediction: Prediction) => {
@@ -243,9 +250,14 @@ const AdaBetsPage: React.FC = () => {
             {router.pathname === '/adabets' && (
               <ShinyButton
                 text="Create Bet"
-                color="rgb(59, 130, 246)"
+                color={connected ? "rgb(59, 130, 246)" : "rgb(156, 163, 175)"}
                 onClick={handleCreateBet}
-                className="px-4 py-2 bg-blue-500 rounded hover:bg-blue-600"
+                className={`px-4 py-2 rounded ${
+                  connected
+                    ? "bg-blue-500 hover:bg-blue-600"
+                    : "bg-gray-500 cursor-not-allowed"
+                }`}
+                disabled={!connected}
               />
             )}
           </div>
@@ -289,7 +301,7 @@ const AdaBetsPage: React.FC = () => {
             onBet={handleBet}
             onAddComment={handleAddComment}
             onVoteComment={handleVoteComment}
-            currentUser={currentUser}
+            wallet={wallet} // Pass the wallet here
           />
         )}
       </div>

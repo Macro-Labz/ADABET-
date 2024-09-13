@@ -5,10 +5,16 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { CardanoWallet, useWallet } from "@meshsdk/react";
 import { useRouter } from 'next/router';
+import { createClient } from '@supabase/supabase-js';
 
 interface HeaderProps {
   borderThickness?: number;
 }
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 const Header: React.FC<HeaderProps> = ({ borderThickness = 2 }) => {
   const { connected, wallet } = useWallet();
@@ -23,21 +29,28 @@ const Header: React.FC<HeaderProps> = ({ borderThickness = 2 }) => {
       if (connected && wallet) {
         try {
           const walletAddress = await wallet.getChangeAddress();
-          const response = await fetch('/api/createUser', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ walletAddress }),
-          });
-          const result = await response.json();
-          if (response.ok) {
-            console.log('User registration result:', result);
+          
+          // Check if user exists
+          const { data: existingUser } = await supabase
+            .from('users')
+            .select('wallet_address')
+            .eq('wallet_address', walletAddress)
+            .single();
+
+          if (!existingUser) {
+            // Insert new user
+            const { data, error } = await supabase
+              .from('users')
+              .insert({ wallet_address: walletAddress })
+              .single();
+
+            if (error) throw error;
+            console.log('New user created:', data);
           } else {
-            console.error('Failed to register user:', result.message);
+            console.log('User already exists:', existingUser);
           }
         } catch (error) {
-          console.error('Error registering user:', error);
+          console.error('Error creating/checking user:', error);
         }
       }
     };

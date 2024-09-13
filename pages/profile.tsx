@@ -7,6 +7,26 @@ import Header from '../components/Header';
 import { GridPattern } from '../components/magicui/animated-grid-pattern';
 import Graph from '../components/Graph';
 
+interface Prediction {
+  id: number;
+  title: string;
+  content: string;
+  yes_ada: number;
+  no_ada: number;
+  end_date: string;
+  initial_stake: number;
+  created_at: string;
+}
+
+interface Bet {
+  id: number;
+  prediction_id: number;
+  amount: number;
+  bet_type: 'yes' | 'no';
+  created_at: string;
+  predictions: { title: string };
+}
+
 const ProfilePage: React.FC = () => {
   const { connected, wallet } = useWallet();
   const router = useRouter();
@@ -15,38 +35,79 @@ const ProfilePage: React.FC = () => {
   const [winningBets, setWinningBets] = useState<number>(0);
   const [losingBets, setLosingBets] = useState<number>(0);
   const [lifetimeProfitLoss, setLifetimeProfitLoss] = useState<number>(0);
+  const [userPredictions, setUserPredictions] = useState<Prediction[]>([]);
+  const [userBets, setUserBets] = useState<Bet[]>([]);
 
   useEffect(() => {
-    if (!connected) {
-      router.push('/');
-    } else {
+    if (connected && wallet) {
       fetchBalance();
-      fetchActiveBets();
-      fetchBetStats(); // New function to fetch bet statistics
+      fetchUserBets();
+      fetchUserPredictions();
+    } else if (!connected) {
+      router.push('/');
     }
-  }, [connected, router, wallet]);
+  }, [connected, wallet, router]);
 
   const fetchBalance = async () => {
     if (wallet) {
       const balance = await wallet.getBalance();
       const lovelace = balance.find((asset) => asset.unit === 'lovelace');
       const adaBalance = lovelace ? BigInt(lovelace.quantity) : BigInt(0);
-      setBalance((Number(adaBalance) / 1000000).toString()); // Convert lovelace to ADA
+      setBalance((Number(adaBalance) / 1000000).toString());
     }
   };
 
-  const fetchActiveBets = async () => {
-    // TODO: Replace this with actual API call or data fetching logic
-    // For now, we'll use a mock value
-    setActiveBets(3); // Example: User has 3 active bets
+  const fetchUserPredictions = async () => {
+    if (wallet) {
+      try {
+        const walletAddress = await wallet.getChangeAddress();
+        const response = await fetch(`/api/getUserPredictions?walletAddress=${walletAddress}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch user predictions');
+        }
+        const data = await response.json();
+        setUserPredictions(data.predictions);
+      } catch (error) {
+        console.error('Error fetching user predictions:', error);
+      }
+    }
   };
 
-  const fetchBetStats = async () => {
-    // TODO: Replace this with actual API call or data fetching logic
-    // For now, we'll use mock values
-    setWinningBets(7); // Example: User has 7 winning bets
-    setLosingBets(3); // Example: User has 3 losing bets
-    setLifetimeProfitLoss(1500); // Example: User has a profit of 1500 ADA
+  const fetchUserBets = async () => {
+    if (wallet) {
+      try {
+        const walletAddress = await wallet.getChangeAddress();
+        console.log('Fetching bets for wallet address:', walletAddress);
+        
+        const response = await fetch(`/api/getUserBets?walletAddress=${walletAddress}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch user bets');
+        }
+        const data = await response.json();
+        console.log('Fetched user bets:', data);
+        
+        if (data.status === 'success' && Array.isArray(data.bets)) {
+          setUserBets(data.bets);
+          
+          // Update betting statistics
+          const winningBets = data.bets.filter((bet: Bet) => bet.bet_type === 'yes').length;
+          const losingBets = data.bets.filter((bet: Bet) => bet.bet_type === 'no').length;
+          setWinningBets(winningBets);
+          setLosingBets(losingBets);
+          setActiveBets(data.bets.length);
+
+          // Calculate lifetime profit/loss (this is a simplified calculation)
+          const profitLoss = data.bets.reduce((total: number, bet: Bet) => {
+            return total + (bet.bet_type === 'yes' ? bet.amount : -bet.amount);
+          }, 0);
+          setLifetimeProfitLoss(profitLoss);
+        } else {
+          console.error('Unexpected data format:', data);
+        }
+      } catch (error) {
+        console.error('Error fetching user bets:', error);
+      }
+    }
   };
 
   const calculateWinLossRatio = (): { ratio: string; color: string } => {
@@ -65,7 +126,7 @@ const ProfilePage: React.FC = () => {
   };
 
   if (!connected) {
-    return null; // or a loading spinner
+    return null;
   }
 
   return (
@@ -135,40 +196,66 @@ const ProfilePage: React.FC = () => {
 
         {/* Betting History Box */}
         <div className="w-full mt-8 flex-grow flex flex-col bg-gray-900">
-          <div className="container mx-auto px-4 py-4 flex flex-col h-[400px]"> {/* Set a fixed height */}
+          <div className="container mx-auto px-4 py-4 flex flex-col h-[400px]">
             <h2 className="text-xl font-bold mb-4">Betting History</h2>
             <div className="overflow-y-auto flex-grow">
               <table className="w-full">
-                <thead className="bg-black sticky top-0"> {/* Make header sticky */}
+                <thead className="bg-black sticky top-0">
                   <tr>
-                    <th className="py-2 px-4 text-left">BET - ID</th>
+                    <th className="py-2 px-4 text-left">Prediction</th>
                     <th className="py-2 px-4 text-left">Amount</th>
-                    <th className="py-2 px-4 text-left">Odds</th>
-                    <th className="py-2 px-4 text-left">Result</th>
-                    <th className="py-2 px-4 text-left">Profit/Loss</th>
+                    <th className="py-2 px-4 text-left">Bet Type</th>
+                    <th className="py-2 px-4 text-left">Date</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...Array(10)].map((_, index) => {
-                    const profitLoss = index % 3 === 0 ? '+50' : index % 3 === 1 ? '0' : '-100';
-                    const profitLossColor = 
-                      profitLoss.startsWith('+') ? 'text-green-500' :
-                      profitLoss.startsWith('-') ? 'text-red-500' : 'text-blue-500';
-                    
-                    return (
-                      <tr key={index} className="bg-black border-b border-gray-700">
-                        <td className="py-2 px-4">BET-{1000 + index}</td>
-                        <td className="py-2 px-4 text-blue-500">100 ADA</td>
-                        <td className="py-2 px-4">1.5</td>
-                        <td className={`py-2 px-4 ${index % 2 === 0 ? 'text-green-500' : 'text-red-500'}`}>
-                          {index % 2 === 0 ? 'Win' : 'Loss'}
+                  {userBets.length > 0 ? (
+                    userBets.map((bet) => (
+                      <tr key={bet.id} className="bg-black border-b border-gray-700">
+                        <td className="py-2 px-4">{bet.predictions?.title || 'Unknown Prediction'}</td>
+                        <td className="py-2 px-4 text-blue-500">{bet.amount} ADA</td>
+                        <td className={`py-2 px-4 ${bet.bet_type === 'yes' ? 'text-green-500' : 'text-red-500'}`}>
+                          {bet.bet_type.toUpperCase()}
                         </td>
-                        <td className={`py-2 px-4 ${profitLossColor}`}>
-                          {profitLoss} ADA
-                        </td>
+                        <td className="py-2 px-4">{new Date(bet.created_at).toLocaleString()}</td>
                       </tr>
-                    );
-                  })}
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="py-4 text-center">No betting history available</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* User's Created Predictions */}
+        <div className="w-full mt-8 flex-grow flex flex-col bg-gray-900">
+          <div className="container mx-auto px-4 py-4 flex flex-col h-[400px]">
+            <h2 className="text-xl font-bold mb-4">Your Created Predictions</h2>
+            <div className="overflow-y-auto flex-grow">
+              <table className="w-full">
+                <thead className="bg-black sticky top-0">
+                  <tr>
+                    <th className="py-2 px-4 text-left">Title</th>
+                    <th className="py-2 px-4 text-left">Yes ADA</th>
+                    <th className="py-2 px-4 text-left">No ADA</th>
+                    <th className="py-2 px-4 text-left">End Date</th>
+                    <th className="py-2 px-4 text-left">Created At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {userPredictions.map((prediction) => (
+                    <tr key={prediction.id} className="bg-black border-b border-gray-700">
+                      <td className="py-2 px-4">{prediction.title}</td>
+                      <td className="py-2 px-4 text-green-500">{prediction.yes_ada} ADA</td>
+                      <td className="py-2 px-4 text-red-500">{prediction.no_ada} ADA</td>
+                      <td className="py-2 px-4">{new Date(prediction.end_date).toLocaleDateString()}</td>
+                      <td className="py-2 px-4">{new Date(prediction.created_at).toLocaleString()}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
