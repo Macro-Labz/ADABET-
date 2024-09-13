@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ChangeEvent } from 'react';
 import ShinyButton from './magicui/shiny-button';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
@@ -26,15 +26,15 @@ interface PredictionDetailsProps {
     id: number;
     title: string;
     content: string;
-    yesAda: number;
-    noAda: number;
-    endDate: string;
+    yes_ada: number;
+    no_ada: number;
+    end_date: string;
     bets: Bet[];
     comments: Comment[];
   };
   onClose: () => void;
   onBet: (predictionId: number, betType: 'yes' | 'no', amount: number) => void;
-  onAddComment: (predictionId: number, comment: Omit<Comment, 'id' | 'timestamp' | 'upvotes' | 'downvotes'>) => void;
+  onAddComment: (predictionId: number, commentContent: string) => void;
   onVoteComment: (predictionId: number, commentId: number, voteType: 'up' | 'down') => void;
   currentUser: string;
 }
@@ -49,7 +49,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 }) => {
   const [betAmount, setBetAmount] = useState('');
   const [chartData, setChartData] = useState<{ name: string; yes: number; no: number; }[]>([]); // Specify the type
-  const [commentText, setCommentText] = useState('');
+  const [commentContent, setCommentContent] = useState('');
   const [memeUrl, setMemeUrl] = useState('');
   const [showMemeSelector, setShowMemeSelector] = useState(false);
 
@@ -63,12 +63,12 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
   useEffect(() => {
     updateChartData();
-  }, [prediction.yesAda, prediction.noAda]);
+  }, [prediction.yes_ada, prediction.no_ada]);
 
   const updateChartData = () => {
-    const totalAda = prediction.yesAda + prediction.noAda;
-    const yesRatio = totalAda > 0 ? prediction.yesAda / totalAda : 0.5;
-    const noRatio = totalAda > 0 ? prediction.noAda / totalAda : 0.5;
+    const totalAda = prediction.yes_ada + prediction.no_ada;
+    const yesRatio = totalAda > 0 ? prediction.yes_ada / totalAda : 0.5;
+    const noRatio = totalAda > 0 ? prediction.no_ada / totalAda : 0.5;
 
     const newDataPoint = {
       name: new Date().toLocaleTimeString(),
@@ -94,14 +94,9 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   };
 
   const handleAddComment = () => {
-    if (commentText.trim()) {
-      onAddComment(prediction.id, {
-        user: 'Current User', // Replace with actual user data when available
-        text: commentText,
-        memeUrl: memeUrl,
-      });
-      setCommentText('');
-      setMemeUrl('');
+    if (commentContent.trim()) {
+      onAddComment(prediction.id, commentContent);
+      setCommentContent('');
     }
   };
 
@@ -111,10 +106,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   };
 
   const handleVote = (commentId: number, voteType: 'up' | 'down') => {
-    const comment = prediction.comments.find(c => c.id === commentId);
-    if (comment && comment.userVote !== voteType) {
-      onVoteComment(prediction.id, commentId, voteType);
-    }
+    onVoteComment(prediction.id, commentId, voteType);
   };
 
   return (
@@ -123,9 +115,9 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
         <div className="p-6 overflow-y-auto flex-grow">
           <h2 className="text-2xl font-bold mb-4">{prediction.title}</h2>
           <p className="mb-4">{prediction.content}</p>
-          <p className="mb-2">End Date: {prediction.endDate}</p>
-          <p className="mb-2">Yes: {prediction.yesAda} ADA</p>
-          <p className="mb-2">No: {prediction.noAda} ADA</p>
+          <p className="mb-2">End Date: {prediction.end_date}</p>
+          <p className="mb-2">Yes: {prediction.yes_ada} ADA</p>
+          <p className="mb-2">No: {prediction.no_ada} ADA</p>
 
           <div className="mb-6">
             <h3 className="text-xl font-semibold mb-2">Place Your Bet</h3>
@@ -168,11 +160,15 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
           <div className="mb-6">
             <h3 className="text-xl font-semibold mb-2">Recent Bets</h3>
             <ul className="space-y-2 max-h-40 overflow-y-auto">
-              {prediction.bets.map((bet) => (
-                <li key={bet.id} className="bg-gray-700 p-2 rounded">
-                  {bet.user} bet {bet.amount} ADA on {bet.type} at {bet.timestamp}
-                </li>
-              ))}
+              {prediction.bets && prediction.bets.length > 0 ? (
+                prediction.bets.map((bet) => (
+                  <li key={bet.id} className="bg-gray-700 p-2 rounded">
+                    {bet.user} bet {bet.amount} ADA on {bet.type} at {bet.timestamp}
+                  </li>
+                ))
+              ) : (
+                <li className="bg-gray-700 p-2 rounded">No bets yet</li>
+              )}
             </ul>
           </div>
 
@@ -180,8 +176,8 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
             <h3 className="text-xl font-semibold mb-2">Comments</h3>
             <div className="mb-4">
               <textarea
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
+                value={commentContent}
+                onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setCommentContent(e.target.value)}
                 placeholder="Add a comment..."
                 className="w-full px-3 py-2 bg-gray-700 rounded"
                 rows={3}
@@ -222,36 +218,40 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
               />
             </div>
             <ul className="space-y-4 max-h-60 overflow-y-auto">
-              {prediction.comments.map((comment) => (
-                <li key={comment.id} className="bg-gray-700 p-4 rounded">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-semibold">{comment.user}</p>
-                      <p>{comment.text}</p>
-                      {comment.memeUrl && (
-                        <img src={comment.memeUrl} alt="Meme" className="mt-2 max-w-full h-auto" />
-                      )}
-                      <p className="text-sm text-gray-400 mt-2">{comment.timestamp}</p>
+              {prediction.comments && prediction.comments.length > 0 ? (
+                prediction.comments.map((comment) => (
+                  <li key={comment.id} className="bg-gray-700 p-4 rounded">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-semibold">{comment.user || 'Anonymous'}</p>
+                        <p>{comment.text}</p>
+                        {comment.memeUrl && (
+                          <img src={comment.memeUrl} alt="Meme" className="mt-2 max-w-full h-auto" />
+                        )}
+                        <p className="text-sm text-gray-400 mt-2">{comment.timestamp}</p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleVote(comment.id, 'up')}
+                          className={`text-green-500 hover:text-green-600 ${comment.userVote === 'up' ? 'font-bold' : ''}`}
+                          disabled={comment.userVote === 'up'}
+                        >
+                          ▲ {comment.upvotes}
+                        </button>
+                        <button
+                          onClick={() => handleVote(comment.id, 'down')}
+                          className={`text-red-500 hover:text-red-600 ${comment.userVote === 'down' ? 'font-bold' : ''}`}
+                          disabled={comment.userVote === 'down'}
+                        >
+                          ▼ {comment.downvotes}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={() => handleVote(comment.id, 'up')}
-                        className={`text-green-500 hover:text-green-600 ${comment.userVote === 'up' ? 'font-bold' : ''}`}
-                        disabled={comment.userVote === 'up'}
-                      >
-                        ▲ {comment.upvotes}
-                      </button>
-                      <button
-                        onClick={() => handleVote(comment.id, 'down')}
-                        className={`text-red-500 hover:text-red-600 ${comment.userVote === 'down' ? 'font-bold' : ''}`}
-                        disabled={comment.userVote === 'down'}
-                      >
-                        ▼ {comment.downvotes}
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                ))
+              ) : (
+                <li className="bg-gray-700 p-4 rounded">No comments yet</li>
+              )}
             </ul>
           </div>
         </div>

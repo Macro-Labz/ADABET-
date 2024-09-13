@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import ShinyButton from './magicui/shiny-button';
+import { useWallet } from "@meshsdk/react";
 
 interface CreateBetFormProps {
   onClose: () => void;
@@ -11,77 +11,95 @@ const CreateBetForm: React.FC<CreateBetFormProps> = ({ onClose, onSubmit }) => {
   const [content, setContent] = useState('');
   const [endDate, setEndDate] = useState('');
   const [initialStake, setInitialStake] = useState('');
+  const { wallet } = useWallet();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({
-      id: Date.now(),
-      title,
-      content,
-      endDate,
-      initialStake: parseFloat(initialStake),
-    });
+    
+    if (!wallet) {
+      console.error('Wallet not connected');
+      return;
+    }
+
+    const walletAddress = await wallet.getChangeAddress();
+
+    try {
+      const response = await fetch('/api/createPrediction', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title,
+          content,
+          endDate,
+          initialStake: parseFloat(initialStake),
+          creatorWalletAddress: walletAddress,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create prediction');
+      }
+
+      const data = await response.json();
+      onSubmit(data.prediction);
+      onClose();
+    } catch (error) {
+      console.error('Error creating prediction:', error);
+      // Handle error (e.g., show error message to user)
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 p-6 rounded-lg w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-4">Create New Prediction Market</h2>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+      <div className="bg-gray-800 p-6 rounded-lg w-96">
+        <h2 className="text-xl font-bold mb-4">Create New Prediction</h2>
         <form onSubmit={handleSubmit}>
-          <div className="mb-4">
-            <label className="block mb-2">Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full p-2 bg-gray-700 rounded"
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block mb-2">Content</label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="w-full p-2 bg-gray-700 rounded"
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block mb-2">End Date</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full p-2 bg-gray-700 rounded"
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block mb-2">Initial Stake (ADA)</label>
-            <input
-              type="number"
-              value={initialStake}
-              onChange={(e) => setInitialStake(e.target.value)}
-              className="w-full p-2 bg-gray-700 rounded"
-              required
-              min="0"
-              step="0.1"
-            />
-          </div>
-          <div className="flex justify-end space-x-2">
-            <ShinyButton
-              text="Cancel"
-              color="rgb(239, 68, 68)"
+          <input
+            type="text"
+            placeholder="Title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full p-2 mb-2 bg-gray-700 rounded"
+            required
+          />
+          <textarea
+            placeholder="Content"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            className="w-full p-2 mb-2 bg-gray-700 rounded"
+            required
+          />
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="w-full p-2 mb-2 bg-gray-700 rounded"
+            required
+          />
+          <input
+            type="number"
+            placeholder="Initial Stake (ADA)"
+            value={initialStake}
+            onChange={(e) => setInitialStake(e.target.value)}
+            className="w-full p-2 mb-2 bg-gray-700 rounded"
+            required
+          />
+          <div className="flex justify-end">
+            <button
+              type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-red-500 rounded hover:bg-red-600"
-            />
-            <ShinyButton
-              text="Create"
-              color="rgb(34, 197, 94)"
-              onClick={() => handleSubmit({} as React.FormEvent)}
-              className="px-4 py-2 bg-green-500 rounded hover:bg-green-600"
-            />
+              className="px-4 py-2 bg-gray-600 rounded mr-2"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-500 rounded"
+            >
+              Create
+            </button>
           </div>
         </form>
       </div>

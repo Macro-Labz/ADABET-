@@ -10,18 +10,39 @@ import PredictionDetails from '../components/PredictionDetails';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 
-// Define the Prediction interface
+// Update the Prediction interface
 interface Prediction {
   id: number;
   title: string;
   content: string;
-  yesAda: number;
-  noAda: number;
-  endDate: string;
-  bets: any[]; // Replace 'any' with a more specific type if available
-  comments: any[]; // Replace 'any' with a more specific type if available
+  yes_ada: number;
+  no_ada: number;
+  end_date: string;
+  initial_stake: number;
+  creator_wallet_address: string;
+  created_at: string;
+  bets: Bet[];
+  comments: Comment[];
   color: string;
-  initialStake: string; // Add this line to include initialStake
+}
+
+// Define the Bet interface
+interface Bet {
+  id: number;
+  user: string;
+  amount: number;
+  type: 'yes' | 'no';
+  timestamp: string;
+}
+
+// Update the Comment interface
+interface Comment {
+  id: number;
+  content: string;
+  timestamp: string;
+  upvotes: number;
+  downvotes: number;
+  userVote?: 'up' | 'down';
 }
 
 // Update this function in the AdaBetsPage component
@@ -39,30 +60,38 @@ const AdaBetsPage: React.FC = () => {
   const router = useRouter();
 
   useEffect(() => {
-    // Generate predictions on the client-side only
-    setPredictions([...Array(16)].map((_, index) => ({
-      id: index,
-      title: `Prediction ${index + 1}`,
-      content: `Content for prediction ${index + 1}`,
-      yesAda: Math.floor(Math.random() * 1000),
-      noAda: Math.floor(Math.random() * 1000),
-      endDate: new Date(Date.now() + Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      bets: [],
-      comments: [],
-      color: generateUniqueColor(index), // Add this line to assign a unique color
-      initialStake: '0', // Add this line to include initialStake
-    })));
+    fetchPredictions();
   }, []);
+
+  const fetchPredictions = async () => {
+    try {
+      const response = await fetch('/api/getPredictions');
+      if (!response.ok) {
+        throw new Error('Failed to fetch predictions');
+      }
+      const data = await response.json();
+      setPredictions(data.predictions.map((pred: Prediction) => ({
+        ...pred,
+        color: generateUniqueColor(pred.id),
+        yesAda: pred.yes_ada,
+        noAda: pred.no_ada,
+        endDate: pred.end_date,
+        initialStake: pred.initial_stake.toString(),
+      })));
+    } catch (error) {
+      console.error('Error fetching predictions:', error);
+    }
+  };
 
   const handleBet = (predictionId: number, betType: 'yes' | 'no', amount: number) => {
     setPredictions(predictions.map(pred => {
       if (pred.id === predictionId) {
         const updatedPrediction = {
           ...pred,
-          yesAda: betType === 'yes' ? pred.yesAda + amount : pred.yesAda,
-          noAda: betType === 'no' ? pred.noAda + amount : pred.noAda,
+          yes_ada: betType === 'yes' ? pred.yes_ada + amount : pred.yes_ada,
+          no_ada: betType === 'no' ? pred.no_ada + amount : pred.no_ada,
           bets: [
-            ...pred.bets,
+            ...(pred.bets || []),
             {
               id: Date.now(),
               user: 'Current User', // Replace with actual user data when available
@@ -72,7 +101,7 @@ const AdaBetsPage: React.FC = () => {
             },
           ],
         };
-        setSelectedPrediction(updatedPrediction); // Update the selected prediction
+        setSelectedPrediction(updatedPrediction);
         return updatedPrediction;
       }
       return pred;
@@ -87,8 +116,8 @@ const AdaBetsPage: React.FC = () => {
     setPredictions([
       {
         ...newPrediction,
-        yesAda: parseFloat(newPrediction.initialStake),
-        noAda: 0,
+        color: generateUniqueColor(newPrediction.id),
+        bets: [],
       },
       ...predictions
     ]);
@@ -104,23 +133,23 @@ const AdaBetsPage: React.FC = () => {
     setSelectedPrediction(prediction);
   };
 
-  // Ensure the Comment type is correctly defined
+  // Update the Comment interface
   interface Comment {
     id: number;
-    content: string; // Add other properties as needed
+    content: string;
     timestamp: string;
     upvotes: number;
     downvotes: number;
-    userVote?: 'up' | 'down'; // Optional property for user vote
+    userVote?: 'up' | 'down';
   }
 
-  // Update the handleAddComment function signature
-  const handleAddComment = (predictionId: number, comment: Omit<Comment, 'id' | 'timestamp' | 'upvotes' | 'downvotes'>) => {
+  // Update the handleAddComment function
+  const handleAddComment = (predictionId: number, commentContent: string) => {
     setPredictions(predictions.map(pred => {
       if (pred.id === predictionId) {
-        const newComment = {
-          ...comment,
+        const newComment: Comment = {
           id: Date.now(),
+          content: commentContent,
           timestamp: new Date().toISOString(),
           upvotes: 0,
           downvotes: 0,
@@ -230,10 +259,10 @@ const AdaBetsPage: React.FC = () => {
               >
                 <h3 className="text-lg font-semibold mb-2">{prediction.title}</h3>
                 <p className="mb-2">{prediction.content}</p>
-                <p className="text-sm mb-1">End Date: {prediction.endDate}</p>
-                <p className="text-sm mb-1">Yes: {prediction.yesAda} ADA</p>
-                <p className="text-sm mb-1">No: {prediction.noAda} ADA</p>
-                <p className="text-sm mb-2">Ratio: {calculateRatio(prediction.yesAda, prediction.noAda)}</p>
+                <p className="text-sm mb-1">End Date: {prediction.end_date}</p>
+                <p className="text-sm mb-1">Yes: {prediction.yes_ada} ADA</p>
+                <p className="text-sm mb-1">No: {prediction.no_ada} ADA</p>
+                <p className="text-sm mb-2">Ratio: {calculateRatio(prediction.yes_ada, prediction.no_ada)}</p>
                 <div className="mt-4">
                   <ShinyButton
                     text="BET"
@@ -258,7 +287,7 @@ const AdaBetsPage: React.FC = () => {
             prediction={selectedPrediction}
             onClose={() => setSelectedPrediction(null)}
             onBet={handleBet}
-            onAddComment={handleAddComment} // Ensure this matches the expected type
+            onAddComment={handleAddComment}
             onVoteComment={handleVoteComment}
             currentUser={currentUser}
           />
