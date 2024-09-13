@@ -1,4 +1,4 @@
-'use client';
+'use client'
 
 import React from 'react';
 import Image from "next/image";
@@ -6,10 +6,10 @@ import Link from 'next/link';
 import { Inter } from "next/font/google";
 import Head from "next/head";
 import { MeshBadge } from "@meshsdk/react";
-import Header from '../../@/components/Header';
-import { GridPattern } from "../../@/components/magicui/animated-grid-pattern";
-import BlurIn from "../../@/components/magicui/blur-in";
-import ShineBorder from "../../@/components/magicui/shine-border";
+import Header from '../components/Header';
+import { GridPattern } from '../components/magicui/animated-grid-pattern';
+import BlurIn from '../components/magicui/blur-in';
+import ShineBorder from '../components/magicui/shine-border';
 
 const inter = Inter({ subsets: ["latin"] });
 

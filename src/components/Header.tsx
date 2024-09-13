@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { CardanoWallet, useWallet } from "@meshsdk/react";
@@ -11,12 +11,35 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ borderThickness = 2 }) => {
-  const { connected } = useWallet();
+  const { connected, wallet } = useWallet();
   const router = useRouter();
   const isProfilePage = router.pathname === '/profile';
 
   const buttonText = isProfilePage ? 'BETTING' : 'PROFILE';
   const buttonHref = isProfilePage ? '/adabets' : '/profile';
+
+  useEffect(() => {
+    const createUserIfNeeded = async () => {
+      if (connected && wallet) {
+        try {
+          const walletAddress = await wallet.getChangeAddress();
+          const response = await fetch('/api/createUser', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ walletAddress }),
+          });
+          const result = await response.json();
+          console.log('User creation result:', result);
+        } catch (error) {
+          console.error('Error creating user:', error);
+        }
+      }
+    };
+
+    createUserIfNeeded();
+  }, [connected, wallet]);
 
   return (
     <header className="bg-[#000033] text-white relative">

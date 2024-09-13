@@ -79,7 +79,7 @@ const CreateBetForm: React.FC<CreateBetFormProps> = ({ onClose, onSubmit }) => {
             <ShinyButton
               text="Create"
               color="rgb(34, 197, 94)"
-              onClick={() => handleSubmit(new Event('submit') as React.FormEvent)}
+              onClick={() => handleSubmit({} as React.FormEvent)}
               className="px-4 py-2 bg-green-500 rounded hover:bg-green-600"
             />
           </div>

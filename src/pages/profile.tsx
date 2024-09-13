@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useWallet } from "@meshsdk/react";
-import Header from '../../@/components/Header';
-import { GridPattern } from '../../@/components/magicui/animated-grid-pattern';
-import Graph from '../../@/components/Graph';
+import Header from '../components/Header';
+import { GridPattern } from '../components/magicui/animated-grid-pattern';
+import Graph from '../components/Graph';
 
 const ProfilePage: React.FC = () => {
   const { connected, wallet } = useWallet();

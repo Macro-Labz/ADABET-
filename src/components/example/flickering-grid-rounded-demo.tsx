@@ -1,4 +1,4 @@
-import FlickeringGrid from "../../components/magicui/flickering-grid";
+import FlickeringGrid from "../magicui/flickering-grid";
 
 export default function FlickeringGridRoundedDemo() {
   return (

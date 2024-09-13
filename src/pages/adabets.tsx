@@ -1,14 +1,28 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Header from '../../@/components/Header';
-import BetPopup from '../../@/components/BetPopup';
-import ShinyButton from '../../@/components/magicui/shiny-button';
-import { GridPattern } from '../../@/components/magicui/animated-grid-pattern';
-import CreateBetForm from '../../@/components/CreateBetForm';
-import PredictionDetails from '../../@/components/PredictionDetails';
+import Header from '../components/Header';
+import BetPopup from '../components/BetPopup';
+import ShinyButton from '../components/magicui/shiny-button';
+import { GridPattern } from '../components/magicui/animated-grid-pattern';
+import CreateBetForm from '../components/CreateBetForm';
+import PredictionDetails from '../components/PredictionDetails';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+
+// Define the Prediction interface
+interface Prediction {
+  id: number;
+  title: string;
+  content: string;
+  yesAda: number;
+  noAda: number;
+  endDate: string;
+  bets: any[]; // Replace 'any' with a more specific type if available
+  comments: any[]; // Replace 'any' with a more specific type if available
+  color: string;
+  initialStake: string; // Add this line to include initialStake
+}
 
 // Update this function in the AdaBetsPage component
 const generateUniqueColor = (index: number) => {
@@ -19,8 +33,8 @@ const generateUniqueColor = (index: number) => {
 const AdaBetsPage: React.FC = () => {
   const [showPopup, setShowPopup] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [predictions, setPredictions] = useState([]);
-  const [selectedPrediction, setSelectedPrediction] = useState(null);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [selectedPrediction, setSelectedPrediction] = useState<Prediction | null>(null); // Update type to allow Prediction or null
   const [currentUser, setCurrentUser] = useState('User1'); // Simulating a logged-in user
   const router = useRouter();
 
@@ -36,6 +50,7 @@ const AdaBetsPage: React.FC = () => {
       bets: [],
       comments: [],
       color: generateUniqueColor(index), // Add this line to assign a unique color
+      initialStake: '0', // Add this line to include initialStake
     })));
   }, []);
 
@@ -68,7 +83,7 @@ const AdaBetsPage: React.FC = () => {
     setShowCreateForm(true);
   };
 
-  const handleNewPrediction = (newPrediction) => {
+  const handleNewPrediction = (newPrediction: Prediction) => {
     setPredictions([
       {
         ...newPrediction,
@@ -85,10 +100,21 @@ const AdaBetsPage: React.FC = () => {
     return total > 0 ? (yesAda / total).toFixed(2) : '0.50';
   };
 
-  const handlePredictionClick = (prediction) => {
+  const handlePredictionClick = (prediction: Prediction) => {
     setSelectedPrediction(prediction);
   };
 
+  // Ensure the Comment type is correctly defined
+  interface Comment {
+    id: number;
+    content: string; // Add other properties as needed
+    timestamp: string;
+    upvotes: number;
+    downvotes: number;
+    userVote?: 'up' | 'down'; // Optional property for user vote
+  }
+
+  // Update the handleAddComment function signature
   const handleAddComment = (predictionId: number, comment: Omit<Comment, 'id' | 'timestamp' | 'upvotes' | 'downvotes'>) => {
     setPredictions(predictions.map(pred => {
       if (pred.id === predictionId) {
@@ -232,7 +258,7 @@ const AdaBetsPage: React.FC = () => {
             prediction={selectedPrediction}
             onClose={() => setSelectedPrediction(null)}
             onBet={handleBet}
-            onAddComment={handleAddComment}
+            onAddComment={handleAddComment} // Ensure this matches the expected type
             onVoteComment={handleVoteComment}
             currentUser={currentUser}
           />

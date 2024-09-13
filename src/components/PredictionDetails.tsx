@@ -48,7 +48,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   currentUser
 }) => {
   const [betAmount, setBetAmount] = useState('');
-  const [chartData, setChartData] = useState([]);
+  const [chartData, setChartData] = useState<{ name: string; yes: number; no: number; }[]>([]); // Specify the type
   const [commentText, setCommentText] = useState('');
   const [memeUrl, setMemeUrl] = useState('');
   const [showMemeSelector, setShowMemeSelector] = useState(false);
