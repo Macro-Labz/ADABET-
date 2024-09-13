@@ -30,13 +30,14 @@ const Header: React.FC<HeaderProps> = ({ borderThickness = 2 }) => {
             },
             body: JSON.stringify({ walletAddress }),
           });
-          if (!response.ok) {
-            throw new Error('Failed to create user');
-          }
           const result = await response.json();
-          console.log('User creation result:', result);
+          if (response.ok) {
+            console.log('User registration result:', result);
+          } else {
+            console.error('Failed to register user:', result.message);
+          }
         } catch (error) {
-          console.error('Error creating user:', error);
+          console.error('Error registering user:', error);
         }
       }
     };
