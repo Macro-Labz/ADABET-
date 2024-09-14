@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Header from '../components/Header';
 import BetPopup from '../components/BetPopup';
 import ShinyButton from '../components/magicui/shiny-button';
@@ -14,6 +14,9 @@ import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
 import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, endOfDay, isPast } from 'date-fns';
+import { AnimatedList } from '../components/magicui/animated-list';
+import { useInterval } from '../hooks/useInterval'; // Create this custom hook
+import { AnimatePresence, motion } from 'framer-motion';
 
 // Update the Prediction interface
 interface Prediction {
@@ -50,6 +53,11 @@ interface Comment {
   created_at: string;
   upvotes: number;
   downvotes: number;
+  voters: { [key: string]: 'up' | 'down' };
+}
+
+interface UserBet extends Bet {
+  prediction_title: string;
 }
 
 // Update this function in the AdaBetsPage component
@@ -57,6 +65,11 @@ const generateUniqueColor = (index: number) => {
   const hue = (index * 137.5) % 360; // Golden angle approximation
   return `hsl(${hue}, 85%, 35%)`; // Increased saturation, decreased lightness
 };
+
+interface Notification {
+  message: string;
+  type: 'success' | 'error';
+}
 
 const AdaBetsPage: React.FC = () => {
   const [showPopup, setShowPopup] = useState(false);
@@ -66,10 +79,20 @@ const AdaBetsPage: React.FC = () => {
   const [currentUser, setCurrentUser] = useState('User1'); // Simulating a logged-in user
   const router = useRouter();
   const { connected, wallet } = useWallet();
+  const [newBetId, setNewBetId] = useState<number | null>(null);
+  const [latestUserBets, setLatestUserBets] = useState<UserBet[]>([]);
+  const [notification, setNotification] = useState<Notification | null>(null);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     fetchPredictions();
+    fetchLatestUserBets();
   }, []);
+
+  // Add polling for latest bets
+  useInterval(() => {
+    fetchLatestUserBets();
+  }, 30000); // Poll every 30 seconds
 
   const fetchPredictions = async () => {
     try {
@@ -85,40 +108,116 @@ const AdaBetsPage: React.FC = () => {
         noAda: pred.no_ada,
         endDate: pred.end_date,
         initialStake: pred.initial_stake.toString(),
-      })));
+      })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
     } catch (error) {
       console.error('Error fetching predictions:', error);
     }
   };
 
-  const handleBet = (predictionId: number, betType: 'yes' | 'no', amount: number) => {
-    setPredictions(predictions.map(pred => {
-      if (pred.id === predictionId) {
-        if (isPast(endOfDay(new Date(pred.end_date)))) {
-          alert("This prediction has ended and can't be bet on.");
-          return pred;
-        }
-        const updatedPrediction = {
-          ...pred,
-          yes_ada: betType === 'yes' ? pred.yes_ada + amount : pred.yes_ada,
-          no_ada: betType === 'no' ? pred.no_ada + amount : pred.no_ada,
-          bets: [
-            ...(pred.bets || []),
-            {
-              id: Date.now(),
-              prediction_id: predictionId,
-              user_wallet_address: 'Current User',
-              amount: amount,
-              bet_type: betType,
-              created_at: new Date().toISOString(),
-            },
-          ],
-        };
-        setSelectedPrediction(updatedPrediction);
-        return updatedPrediction;
+  const fetchLatestUserBets = async () => {
+    try {
+      const response = await fetch('/api/getLatestBets');
+      if (!response.ok) {
+        throw new Error('Failed to fetch latest bets');
       }
-      return pred;
-    }));
+      const data = await response.json();
+      setLatestUserBets(data.bets);
+    } catch (error) {
+      console.error('Error fetching latest bets:', error);
+    }
+  };
+
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 7000); // Clear notification after 7 seconds
+  };
+
+  const handleBet = async (predictionId: number, betType: 'yes' | 'no', amount: number) => {
+    if (!connected || !wallet) {
+      showNotification("Please connect your wallet to place a bet.", 'error');
+      return;
+    }
+
+    if (isSubmittingRef.current) {
+      console.log('Bet submission already in progress');
+      return;
+    }
+
+    isSubmittingRef.current = true;
+
+    try {
+      const walletAddress = await wallet.getChangeAddress();
+
+      // Call the API to create the bet
+      const response = await fetch('/api/createBet', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          predictionId,
+          userWalletAddress: walletAddress,
+          amount,
+          betType,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to place bet');
+      }
+
+      const { data } = await response.json();
+
+      // Update the local state with the new bet
+      setPredictions(predictions.map(pred => {
+        if (pred.id === predictionId) {
+          return {
+            ...pred,
+            yes_ada: betType === 'yes' ? pred.yes_ada + amount : pred.yes_ada,
+            no_ada: betType === 'no' ? pred.no_ada + amount : pred.no_ada,
+            bets: [data, ...pred.bets],
+          };
+        }
+        return pred;
+      }));
+
+      setNewBetId(data.id);
+      setTimeout(() => setNewBetId(null), 5000); // Clear new bet highlight after 5 seconds
+
+      if (selectedPrediction && selectedPrediction.id === predictionId) {
+        setSelectedPrediction(prev => ({
+          ...prev!,
+          yes_ada: betType === 'yes' ? prev!.yes_ada + amount : prev!.yes_ada,
+          no_ada: betType === 'no' ? prev!.no_ada + amount : prev!.no_ada,
+          bets: [data, ...prev!.bets],
+        }));
+      }
+
+      // Immediately add the new bet to latestUserBets
+      const newBet: UserBet = {
+        ...data,
+        prediction_title: predictions.find(p => p.id === predictionId)?.title || '',
+      };
+      setLatestUserBets(prevBets => [newBet, ...prevBets.slice(0, 9)]);
+
+      // Get the prediction title
+      const predictionTitle = predictions.find(p => p.id === predictionId)?.title || 'Unknown Prediction';
+
+      // Create a more detailed success message
+      const successMessage = `Bet placed successfully!
+        Prediction: ${predictionTitle}
+        Amount: ${amount} ADA
+        Position: ${betType.toUpperCase()}
+        Transaction ID: ${data.id}`;
+
+      showNotification(successMessage, 'success');
+    } catch (error) {
+      console.error('Error placing bet:', error);
+      showNotification(error.message || 'Failed to place bet. Please try again.', 'error');
+    } finally {
+      isSubmittingRef.current = false;
+    }
   };
 
   const handleCreateBet = () => {
@@ -150,18 +249,6 @@ const AdaBetsPage: React.FC = () => {
     setSelectedPrediction(prediction);
   };
 
-  // Update the Comment interface
-  interface Comment {
-    id: number;
-    prediction_id: number;
-    user_wallet_address: string;
-    content: string;
-    created_at: string;
-    upvotes: number;
-    downvotes: number;
-  }
-
-  // Update the handleAddComment function
   const handleAddComment = async (predictionId: number, commentContent: string) => {
     if (!wallet) {
       console.error('Wallet not connected');
@@ -266,125 +353,159 @@ const AdaBetsPage: React.FC = () => {
         maxOpacity={0.3}
         duration={5}
       />
-      <div className="relative z-10">
-        <Header borderThickness={1} />
-        <div className="sticky top-0 z-10 bg-[#000033] shadow-md">
-          <div className="flex justify-between items-center py-2 px-4 border-b border-gray-700">
-            <div className="flex overflow-x-auto space-x-2">
-              <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                Top
-              </button>
-              <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                New
-              </button>
-              <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                Crypto Prices
-              </button>
-              <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                Bitcoin
-              </button>
-              <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                Airdrops
-              </button>
-              <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                Ethereum
-              </button>
-              <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                Memecoins
-              </button>
-              <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                Stablecoins
-              </button>
-              <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                Cardano
-              </button>
-              <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                More
-              </button>
+      <div className="relative z-10 flex">
+        <div className="flex-grow">
+          <Header borderThickness={1} />
+          <div className="sticky top-0 z-10 bg-[#000033] shadow-md">
+            <div className="flex justify-between items-center py-2 px-4 border-b border-gray-700">
+              <div className="flex overflow-x-auto space-x-2">
+                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
+                  Top
+                </button>
+                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
+                  New
+                </button>
+                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
+                  Crypto Prices
+                </button>
+                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
+                  Bitcoin
+                </button>
+                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
+                  Airdrops
+                </button>
+                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
+                  Ethereum
+                </button>
+                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
+                  Memecoins
+                </button>
+                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
+                  Stablecoins
+                </button>
+                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
+                  Cardano
+                </button>
+                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
+                  More
+                </button>
+              </div>
+              {router.pathname === '/adabets' && (
+                <ShinyButton
+                  text="Create Bet"
+                  color={connected ? "rgb(59, 130, 246)" : "rgb(156, 163, 175)"}
+                  onClick={handleCreateBet}
+                  className={`px-4 py-2 rounded ${
+                    connected
+                      ? "bg-blue-500 hover:bg-blue-600"
+                      : "bg-gray-500 cursor-not-allowed"
+                  }`}
+                />
+              )}
             </div>
-            {router.pathname === '/adabets' && (
-              <ShinyButton
-                text="Create Bet"
-                color={connected ? "rgb(59, 130, 246)" : "rgb(156, 163, 175)"}
-                onClick={handleCreateBet}
-                className={`px-4 py-2 rounded ${
-                  connected
-                    ? "bg-blue-500 hover:bg-blue-600"
-                    : "bg-gray-500 cursor-not-allowed"
-                }`}
-              />
-            )}
           </div>
-        </div>
-        <div className="container mx-auto px-4 mt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {predictions.map((prediction) => {
-              const percentageChance = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
-              const progressColor = getProgressColor(percentageChance);
-              const timeToEnding = getTimeToEnding(prediction.end_date);
-              const daysLeft = differenceInDays(endOfDay(new Date(prediction.end_date)), new Date());
-              const isEnded = isPast(endOfDay(new Date(prediction.end_date)));
-              return (
-                <div 
-                  key={prediction.id} 
-                  className={`bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors cursor-pointer ${isEnded ? 'opacity-75' : ''}`}
-                  onClick={() => handlePredictionClick(prediction)}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-lg font-semibold w-3/4">{prediction.title}</h3>
-                    <div className="w-1/4 max-w-[80px]">
-                      <CircularProgressbar
-                        value={percentageChance}
-                        text={`${percentageChance.toFixed(0)}%`}
-                        styles={buildStyles({
-                          textSize: '22px',
-                          pathColor: progressColor,
-                          textColor: 'white',
-                          trailColor: '#d6d6d6',
-                        })}
-                      />
+          <div className="container mx-auto px-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {predictions.map((prediction) => {
+                const percentageChance = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
+                const progressColor = getProgressColor(percentageChance);
+                const timeToEnding = getTimeToEnding(prediction.end_date);
+                const daysLeft = differenceInDays(endOfDay(new Date(prediction.end_date)), new Date());
+                const isEnded = isPast(endOfDay(new Date(prediction.end_date)));
+                return (
+                  <div 
+                    key={prediction.id} 
+                    className={`bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors cursor-pointer ${isEnded ? 'opacity-75' : ''} ${prediction.id === newBetId ? 'animate-slide-in' : ''}`}
+                    onClick={() => handlePredictionClick(prediction)}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="text-lg font-semibold w-3/4">{prediction.title}</h3>
+                      <div className="w-1/4 max-w-[80px]">
+                        <CircularProgressbar
+                          value={percentageChance}
+                          text={`${percentageChance.toFixed(0)}%`}
+                          styles={buildStyles({
+                            textSize: '22px',
+                            pathColor: progressColor,
+                            textColor: 'white',
+                            trailColor: '#d6d6d6',
+                          })}
+                        />
+                      </div>
+                    </div>
+                    <p className="mb-2 text-sm text-gray-400">{prediction.content}</p>
+                    <div className="h-20 mb-2">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={generateChartData(prediction)}>
+                          <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-green-500">Yes: {prediction.yes_ada.toFixed(2)} ADA</span>
+                      <span className="text-red-500">No: {prediction.no_ada.toFixed(2)} ADA</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Volume: {(prediction.yes_ada + prediction.no_ada).toFixed(2)} ADA</span>
+                      <span className={`${isEnded ? 'text-red-500 font-bold' : daysLeft <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
+                        {isEnded ? 'Ended' : timeToEnding}
+                      </span>
                     </div>
                   </div>
-                  <p className="mb-2 text-sm text-gray-400">{prediction.content}</p>
-                  <div className="h-20 mb-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={generateChartData(prediction)}>
-                        <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} dot={false} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-green-500">Yes: {prediction.yes_ada.toFixed(2)} ADA</span>
-                    <span className="text-red-500">No: {prediction.no_ada.toFixed(2)} ADA</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Volume: {(prediction.yes_ada + prediction.no_ada).toFixed(2)} ADA</span>
-                    <span className={`${isEnded ? 'text-red-500 font-bold' : daysLeft <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
-                      {isEnded ? 'Ended' : timeToEnding}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
+          {showPopup && <BetPopup onClose={() => setShowPopup(false)} />}
+          {showCreateForm && (
+            <CreateBetForm
+              onClose={() => setShowCreateForm(false)}
+              onSubmit={handleNewPrediction}
+            />
+          )}
+          {selectedPrediction && (
+            <PredictionDetails
+              prediction={selectedPrediction}
+              onClose={handleClosePredictionDetails}
+              onBet={handleBet}
+              wallet={wallet}
+              connected={connected}
+            />
+          )}
         </div>
-        {showPopup && <BetPopup onClose={() => setShowPopup(false)} />}
-        {showCreateForm && (
-          <CreateBetForm
-            onClose={() => setShowCreateForm(false)}
-            onSubmit={handleNewPrediction}
-          />
-        )}
-        {selectedPrediction && (
-          <PredictionDetails
-            prediction={selectedPrediction}
-            onClose={handleClosePredictionDetails}
-            onBet={handleBet}
-            wallet={wallet}
-            connected={connected}
-          />
-        )}
+        <div className="w-64 bg-gray-900 p-4 overflow-y-auto h-screen sticky top-0">
+          <h2 className="text-xl font-bold mb-4">Latest Bets</h2>
+          <AnimatedList delay={2000}>
+            {latestUserBets.map((bet) => (
+              <div key={bet.id} className="bg-gray-800 p-2 rounded mb-2">
+                <p className="text-sm font-semibold">{bet.prediction_title}</p>
+                <p className="text-xs text-gray-400">
+                  {bet.bet_type ? bet.bet_type.toUpperCase() : 'UNKNOWN'} - {bet.amount} ADA
+                </p>
+                <p className="text-xs text-gray-500">
+                  {new Date(bet.created_at).toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </AnimatedList>
+        </div>
       </div>
+      <AnimatePresence>
+        {notification && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className={`fixed top-5 right-5 p-4 rounded-md shadow-lg z-50 ${
+              notification.type === 'success' ? 'bg-green-500' : 'bg-red-500'
+            }`}
+          >
+            {notification.message.split('\n').map((line, index) => (
+              <p key={index} className="whitespace-pre-line">{line}</p>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

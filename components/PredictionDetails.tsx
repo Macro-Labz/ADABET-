@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import ShinyButton from './magicui/shiny-button';
-import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, endOfDay, addDays, isPast } from 'date-fns';
+import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, endOfDay, addDays, isPast, format, subMinutes } from 'date-fns';
 
 interface Bet {
   id: number;
@@ -41,6 +41,29 @@ interface PredictionDetailsProps {
   connected: boolean;
 }
 
+interface ChartDataPoint {
+  timestamp: number;
+  value: number;
+}
+
+// Add this to your CSS (you can put it in a separate file and import it)
+const styles = `
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.new-bet-animation {
+  animation: slideIn 0.5s ease-out;
+}
+`;
+
 const PredictionDetails: React.FC<PredictionDetailsProps> = ({ 
   prediction, 
   onClose, 
@@ -49,12 +72,14 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   connected
 }) => {
   const [betAmount, setBetAmount] = useState('');
-  const [chartData, setChartData] = useState<{ date: string; value: number }[]>([]);
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [commentContent, setCommentContent] = useState('');
   const [memeUrl, setMemeUrl] = useState('');
   const [showMemeSelector, setShowMemeSelector] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
   const [timeRemaining, setTimeRemaining] = useState('');
+  const [newBetId, setNewBetId] = useState<number | null>(null);
+  const [recentBets, setRecentBets] = useState<Bet[]>([]);
 
   const memeOptions = [
     { url: 'https://example.com/meme1.gif', alt: 'Funny meme 1' },
@@ -78,29 +103,59 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   }, [onClose]);
 
   useEffect(() => {
-    // This is a placeholder. In a real scenario, you'd fetch historical data from your API.
-    const generateMockChartData = () => {
-      const data = [];
-      const startDate = new Date(prediction.created_at);
-      const endDate = new Date(prediction.end_date);
-      const daysBetween = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
+    fetchPredictionHistory();
+    fetchRecentBets();
+
+    // Set up polling to update the chart and recent bets every 30 seconds
+    const intervalId = setInterval(() => {
+      fetchPredictionHistory();
+      fetchRecentBets();
+    }, 30000);
+
+    // Clean up the interval when the component unmounts
+    return () => clearInterval(intervalId);
+  }, [prediction.id]);
+
+  const fetchPredictionHistory = async () => {
+    try {
+      const response = await fetch(`/api/getPredictionHistory?predictionId=${prediction.id}`);
+      if (!response.ok) throw new Error('Failed to fetch prediction history');
+      const data = await response.json();
       
-      for (let i = 0; i <= daysBetween; i++) {
-        const date = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
-        data.push({
-          date: date.toISOString().split('T')[0],
-          value: Math.random() * 100
-        });
-      }
-      return data;
-    };
+      // Validate and filter out any invalid data points
+      const validChartData = data.history
+        .filter((point: ChartDataPoint) => 
+          !isNaN(point.value) && 
+          !isNaN(new Date(point.timestamp).getTime()) &&
+          point.value >= 0 && 
+          point.value <= 100
+        )
+        .map((point: ChartDataPoint) => ({
+          ...point,
+          value: parseFloat(point.value.toFixed(2)) // Ensure value is a number with 2 decimal places
+        }));
 
-    setChartData(generateMockChartData());
-  }, [prediction]);
+      console.log('Filtered chart data:', validChartData);
+      setChartData(validChartData);
+    } catch (error) {
+      console.error('Error fetching prediction history:', error);
+    }
+  };
 
-  const calculatePercentageChance = () => {
-    const total = prediction.yes_ada + prediction.no_ada;
-    return total > 0 ? (prediction.yes_ada / total * 100).toFixed(2) : '50.00';
+  const fetchRecentBets = async () => {
+    try {
+      const response = await fetch(`/api/getRecentBets?predictionId=${prediction.id}`);
+      if (!response.ok) throw new Error('Failed to fetch recent bets');
+      const data = await response.json();
+      setRecentBets(data.bets);
+    } catch (error) {
+      console.error('Error fetching recent bets:', error);
+    }
+  };
+
+  const calculatePercentageChance = (yesAda: number, noAda: number) => {
+    const total = yesAda + noAda;
+    return total > 0 ? (yesAda / total * 100) : 50;
   };
 
   useEffect(() => {
@@ -141,6 +196,8 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
       const data = await response.json();
       onBet(prediction.id, type, amount);
       setBetAmount('');
+      setNewBetId(data.data.id);
+      setTimeout(() => setNewBetId(null), 5000); // Clear new bet highlight after 5 seconds
     } catch (error) {
       console.error('Error placing bet:', error);
       alert('Failed to place bet. Please try again.');
@@ -284,12 +341,13 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <style>{styles}</style>
       <div ref={detailsRef} className="bg-gray-800 rounded-lg w-full max-w-4xl m-4 flex flex-col max-h-[90vh]">
         <div className="p-6 overflow-y-auto flex-grow">
           <div className="flex justify-between items-start mb-4">
             <h2 className="text-2xl font-bold">{prediction.title}</h2>
             <div className="text-right">
-              <span className="text-3xl font-bold text-green-500">{calculatePercentageChance()}%</span>
+              <span className="text-3xl font-bold text-green-500">{calculatePercentageChance(prediction.yes_ada, prediction.no_ada).toFixed(2)}%</span>
               <p className={`${differenceInDays(endOfDay(new Date(prediction.end_date)), new Date()) <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
                 {timeRemaining}
               </p>
@@ -301,11 +359,29 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis domain={[0, 100]} />
-                <Tooltip />
+                <XAxis 
+                  dataKey="timestamp" 
+                  tickFormatter={(tick) => format(new Date(tick), 'MM/dd HH:mm')}
+                  type="number"
+                  domain={['dataMin', 'dataMax']}
+                />
+                <YAxis 
+                  domain={[0, 100]} 
+                  allowDataOverflow={true}
+                />
+                <Tooltip 
+                  labelFormatter={(label) => format(new Date(label), 'yyyy-MM-dd HH:mm:ss')}
+                  formatter={(value: number) => [`${value.toFixed(2)}%`, 'Probability']}
+                />
                 <Legend />
-                <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} />
+                <Line 
+                  type="monotone" 
+                  dataKey="value" 
+                  stroke="#8884d8" 
+                  strokeWidth={2} 
+                  dot={false}
+                  isAnimationActive={false}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -357,15 +433,19 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
           <div className="mb-6">
             <h3 className="text-xl font-semibold mb-2">Recent Bets</h3>
             <ul className="space-y-2 max-h-40 overflow-y-auto">
-              {prediction.bets && prediction.bets.length > 0 ? (
-                prediction.bets.map((bet) => (
-                  <li key={bet.id} className="bg-gray-700 p-2 rounded">
-                    {bet.user_wallet_address 
-                      ? `${bet.user_wallet_address.slice(0, 8)}...` 
-                      : 'Anonymous'} bet {bet.amount} ADA on {bet.bet_type} at {
-                        bet.created_at 
-                          ? new Date(bet.created_at).toLocaleString()
-                          : 'Invalid Date'
+              {recentBets.length > 0 ? (
+                recentBets.map((bet) => (
+                  <li 
+                    key={bet.id} 
+                    className={`p-2 rounded ${
+                      bet.bet_type === 'yes' ? 'bg-green-800' : 'bg-red-800'
+                    } ${bet.id === newBetId ? 'new-bet-animation' : ''}`}
+                  >
+                    <span className="font-medium">
+                      {bet.user_wallet_address ? bet.user_wallet_address.slice(0, 8) + '...' : 'Anonymous'}
+                    </span>{' '}
+                    bet {bet.amount} ADA on {bet.bet_type} at {
+                      new Date(bet.created_at).toLocaleString()
                     }
                   </li>
                 ))

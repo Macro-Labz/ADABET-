@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useWallet } from "@meshsdk/react";
 import Header from '../components/Header';
@@ -25,6 +25,7 @@ interface Bet {
   bet_type: 'yes' | 'no';
   created_at: string;
   predictions: { title: string };
+  transaction_id: string;
 }
 
 const ProfilePage: React.FC = () => {
@@ -206,6 +207,7 @@ const ProfilePage: React.FC = () => {
                     <th className="py-2 px-4 text-left">Amount</th>
                     <th className="py-2 px-4 text-left">Bet Type</th>
                     <th className="py-2 px-4 text-left">Date</th>
+                    <th className="py-2 px-4 text-left">Transaction ID</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -218,11 +220,12 @@ const ProfilePage: React.FC = () => {
                           {bet.bet_type.toUpperCase()}
                         </td>
                         <td className="py-2 px-4">{new Date(bet.created_at).toLocaleString()}</td>
+                        <td className="py-2 px-4 text-xs">{bet.transaction_id}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={4} className="py-4 text-center">No betting history available</td>
+                      <td colSpan={5} className="py-4 text-center">No betting history available</td>
                     </tr>
                   )}
                 </tbody>

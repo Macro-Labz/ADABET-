@@ -9,10 +9,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'POST') {
     const { predictionId, userWalletAddress, amount, betType } = req.body;
 
-    console.log('Creating bet with data:', { predictionId, userWalletAddress, amount, betType });
+    console.log('Received bet request:', { predictionId, userWalletAddress, amount, betType });
 
     try {
-      // Start a Supabase transaction
+      // Check if a bet already exists
+      const { data: existingBet, error: checkError } = await supabase
+        .from('bets')
+        .select('id')
+        .eq('prediction_id', predictionId)
+        .eq('user_wallet_address', userWalletAddress)
+        .eq('amount', amount)
+        .eq('bet_type', betType)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError;
+      }
+
+      if (existingBet) {
+        console.log('Bet already exists:', existingBet);
+        return res.status(200).json({ status: 'success', data: existingBet, message: 'Bet already exists' });
+      }
+
+      // If no existing bet, create a new one
       const { data, error } = await supabase.rpc('create_bet_and_update_prediction', {
         p_prediction_id: predictionId,
         p_user_wallet_address: userWalletAddress,
@@ -20,20 +39,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         p_bet_type: betType
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error in create_bet_and_update_prediction:', error);
+        throw error;
+      }
 
-      console.log('New bet created:', data);
-
-      // Fetch the complete bet data
-      const { data: completeBetData, error: fetchError } = await supabase
-        .from('bets')
-        .select('*')
-        .eq('id', data.id)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      res.status(200).json({ status: 'success', data: completeBetData });
+      console.log('Bet created successfully:', data);
+      res.status(200).json({ status: 'success', data });
     } catch (error: any) {
       console.error('Error creating bet:', error);
       res.status(500).json({ status: 'error', message: error.message });
