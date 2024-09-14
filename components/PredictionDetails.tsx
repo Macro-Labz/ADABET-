@@ -1,6 +1,7 @@
-import React, { useState, useEffect, ChangeEvent, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import ShinyButton from './magicui/shiny-button';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, endOfDay, addDays, isPast } from 'date-fns';
 
 interface Bet {
   id: number;
@@ -32,6 +33,7 @@ interface PredictionDetailsProps {
     end_date: string;
     bets: Bet[];
     comments: Comment[];
+    created_at: string;
   };
   onClose: () => void;
   onBet: (predictionId: number, betType: 'yes' | 'no', amount: number) => void;
@@ -47,11 +49,12 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   connected
 }) => {
   const [betAmount, setBetAmount] = useState('');
-  const [chartData, setChartData] = useState<{ name: string; yes: number; no: number; }[]>([]);
+  const [chartData, setChartData] = useState<{ date: string; value: number }[]>([]);
   const [commentContent, setCommentContent] = useState('');
   const [memeUrl, setMemeUrl] = useState('');
   const [showMemeSelector, setShowMemeSelector] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [timeRemaining, setTimeRemaining] = useState('');
 
   const memeOptions = [
     { url: 'https://example.com/meme1.gif', alt: 'Funny meme 1' },
@@ -75,33 +78,34 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   }, [onClose]);
 
   useEffect(() => {
-    updateChartData();
-  }, [prediction.yes_ada, prediction.no_ada]);
+    // This is a placeholder. In a real scenario, you'd fetch historical data from your API.
+    const generateMockChartData = () => {
+      const data = [];
+      const startDate = new Date(prediction.created_at);
+      const endDate = new Date(prediction.end_date);
+      const daysBetween = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24);
+      
+      for (let i = 0; i <= daysBetween; i++) {
+        const date = new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000);
+        data.push({
+          date: date.toISOString().split('T')[0],
+          value: Math.random() * 100
+        });
+      }
+      return data;
+    };
 
-  useEffect(() => {
-    console.log('Prediction bets:', prediction.bets);
-  }, [prediction.bets]);
+    setChartData(generateMockChartData());
+  }, [prediction]);
+
+  const calculatePercentageChance = () => {
+    const total = prediction.yes_ada + prediction.no_ada;
+    return total > 0 ? (prediction.yes_ada / total * 100).toFixed(2) : '50.00';
+  };
 
   useEffect(() => {
     fetchComments();
   }, [prediction.id]);
-
-  const updateChartData = () => {
-    const totalAda = prediction.yes_ada + prediction.no_ada;
-    const yesRatio = totalAda > 0 ? prediction.yes_ada / totalAda : 0.5;
-    const noRatio = totalAda > 0 ? prediction.no_ada / totalAda : 0.5;
-
-    const newDataPoint = {
-      name: new Date().toLocaleTimeString(),
-      yes: yesRatio,
-      no: noRatio,
-    };
-
-    setChartData(prevData => {
-      const updatedData = [...prevData, newDataPoint];
-      return updatedData.slice(-10);
-    });
-  };
 
   const handleBet = async (type: 'yes' | 'no') => {
     if (!connected) {
@@ -137,7 +141,6 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
       const data = await response.json();
       onBet(prediction.id, type, amount);
       setBetAmount('');
-      updateChartData();
     } catch (error) {
       console.error('Error placing bet:', error);
       alert('Failed to place bet. Please try again.');
@@ -226,17 +229,101 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
     return comment.voters?.[wallet.getChangeAddress()] || null;
   };
 
+  const getTimeToEnding = (endDate: string) => {
+    const now = new Date();
+    const end = endOfDay(new Date(endDate));
+    const daysLeft = differenceInDays(end, now);
+    const hoursLeft = differenceInHours(end, now) % 24;
+    const minutesLeft = differenceInMinutes(end, now) % 60;
+    const secondsLeft = differenceInSeconds(end, now) % 60;
+
+    if (daysLeft > 1) {
+      return `${daysLeft}d ${hoursLeft}h left`;
+    } else if (daysLeft === 1) {
+      return `1d ${hoursLeft}h left`;
+    } else if (hoursLeft > 0) {
+      return `${hoursLeft}h ${minutesLeft}m ${secondsLeft}s left`;
+    } else if (minutesLeft > 0) {
+      return `${minutesLeft}m ${secondsLeft}s left`;
+    } else if (secondsLeft > 0) {
+      return `${secondsLeft}s left`;
+    } else {
+      return 'Ended';
+    }
+  };
+
+  useEffect(() => {
+    const updateTimeRemaining = () => {
+      setTimeRemaining(getTimeToEnding(prediction.end_date));
+    };
+
+    // Update immediately and then every second
+    updateTimeRemaining();
+    const intervalId = setInterval(updateTimeRemaining, 1000);
+
+    // Clear the interval when the component unmounts or when the prediction changes
+    return () => clearInterval(intervalId);
+  }, [prediction.end_date]);
+
+  const isEnded = isPast(endOfDay(new Date(prediction.end_date)));
+
+  const getBetSummary = () => {
+    const totalBets = prediction.yes_ada + prediction.no_ada;
+    const yesPercentage = (prediction.yes_ada / totalBets) * 100;
+    const noPercentage = (prediction.no_ada / totalBets) * 100;
+    return (
+      <div className="bg-gray-700 p-4 rounded mb-4">
+        <h3 className="text-xl font-semibold mb-2">Bet Summary</h3>
+        <p>Total bets: {totalBets.toFixed(2)} ADA</p>
+        <p>Yes: {prediction.yes_ada.toFixed(2)} ADA ({yesPercentage.toFixed(2)}%)</p>
+        <p>No: {prediction.no_ada.toFixed(2)} ADA ({noPercentage.toFixed(2)}%)</p>
+        <p>Winner: {yesPercentage > noPercentage ? 'Yes' : 'No'}</p>
+      </div>
+    );
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div ref={detailsRef} className="bg-gray-800 rounded-lg w-full max-w-4xl m-4 flex flex-col max-h-[90vh]">
         <div className="p-6 overflow-y-auto flex-grow">
-          <h2 className="text-2xl font-bold mb-4">{prediction.title}</h2>
-          <p className="mb-4">{prediction.content}</p>
-          <p className="mb-2">End Date: {prediction.end_date}</p>
-          <p className="mb-2">Yes: {prediction.yes_ada} ADA</p>
-          <p className="mb-2">No: {prediction.no_ada} ADA</p>
+          <div className="flex justify-between items-start mb-4">
+            <h2 className="text-2xl font-bold">{prediction.title}</h2>
+            <div className="text-right">
+              <span className="text-3xl font-bold text-green-500">{calculatePercentageChance()}%</span>
+              <p className={`${differenceInDays(endOfDay(new Date(prediction.end_date)), new Date()) <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
+                {timeRemaining}
+              </p>
+            </div>
+          </div>
+          <p className="mb-4 text-gray-400">{prediction.content}</p>
+          
+          <div className="mb-6 h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" />
+                <YAxis domain={[0, 100]} />
+                <Tooltip />
+                <Legend />
+                <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
 
-          {connected ? (
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-green-900 p-4 rounded">
+              <h3 className="text-lg font-semibold mb-2">Yes</h3>
+              <p className="text-2xl font-bold">{prediction.yes_ada} ADA</p>
+            </div>
+            <div className="bg-red-900 p-4 rounded">
+              <h3 className="text-lg font-semibold mb-2">No</h3>
+              <p className="text-2xl font-bold">{prediction.no_ada} ADA</p>
+            </div>
+          </div>
+
+          {isEnded ? (
+            getBetSummary()
+          ) : connected ? (
             <div className="mb-6">
               <h3 className="text-xl font-semibold mb-2">Place Your Bet</h3>
               <div className="flex items-center space-x-4">
@@ -245,7 +332,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
                   value={betAmount}
                   onChange={(e) => setBetAmount(e.target.value)}
                   placeholder="Enter ADA amount"
-                  className="px-3 py-2 bg-gray-700 rounded"
+                  className="px-3 py-2 bg-gray-700 rounded flex-grow"
                 />
                 <ShinyButton
                   text="Bet Yes"
@@ -266,19 +353,6 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
               <p className="text-yellow-500">Connect your wallet to place bets and comment.</p>
             </div>
           )}
-
-          <div className="mb-6">
-            <h3 className="text-xl font-semibold mb-2">Market Prediction Chart</h3>
-            <LineChart width={600} height={300} data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis domain={[0, 1]} />
-              <Tooltip />
-              <Legend />
-              <Line type="monotone" dataKey="yes" stroke="#8884d8" />
-              <Line type="monotone" dataKey="no" stroke="#82ca9d" />
-            </LineChart>
-          </div>
 
           <div className="mb-6">
             <h3 className="text-xl font-semibold mb-2">Recent Bets</h3>

@@ -10,6 +10,10 @@ import PredictionDetails from '../components/PredictionDetails';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useWallet } from "@meshsdk/react";
+import { LineChart, Line, ResponsiveContainer } from 'recharts';
+import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
+import 'react-circular-progressbar/dist/styles.css';
+import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, endOfDay, isPast } from 'date-fns';
 
 // Update the Prediction interface
 interface Prediction {
@@ -90,6 +94,10 @@ const AdaBetsPage: React.FC = () => {
   const handleBet = (predictionId: number, betType: 'yes' | 'no', amount: number) => {
     setPredictions(predictions.map(pred => {
       if (pred.id === predictionId) {
+        if (isPast(endOfDay(new Date(pred.end_date)))) {
+          alert("This prediction has ended and can't be bet on.");
+          return pred;
+        }
         const updatedPrediction = {
           ...pred,
           yes_ada: betType === 'yes' ? pred.yes_ada + amount : pred.yes_ada,
@@ -98,11 +106,11 @@ const AdaBetsPage: React.FC = () => {
             ...(pred.bets || []),
             {
               id: Date.now(),
-              prediction_id: predictionId, // Added prediction_id
-              user_wallet_address: 'Current User', // Replace with actual user data when available
+              prediction_id: predictionId,
+              user_wallet_address: 'Current User',
               amount: amount,
-              bet_type: betType, // Added bet_type
-              created_at: new Date().toISOString(), // Added created_at
+              bet_type: betType,
+              created_at: new Date().toISOString(),
             },
           ],
         };
@@ -133,9 +141,9 @@ const AdaBetsPage: React.FC = () => {
     setShowCreateForm(false);
   };
 
-  const calculateRatio = (yesAda: number, noAda: number) => {
+  const calculatePercentageChance = (yesAda: number, noAda: number) => {
     const total = yesAda + noAda;
-    return total > 0 ? (yesAda / total).toFixed(2) : '0.50';
+    return total > 0 ? (yesAda / total * 100) : 50;
   };
 
   const handlePredictionClick = (prediction: Prediction) => {
@@ -202,6 +210,52 @@ const AdaBetsPage: React.FC = () => {
     setSelectedPrediction(null);
   };
 
+  const generateChartData = (prediction: Prediction) => {
+    // This is a placeholder. In a real scenario, you'd use historical data.
+    return [
+      { time: '1d', value: 50 },
+      { time: '2d', value: 55 },
+      { time: '3d', value: 52 },
+      { time: '4d', value: 58 },
+      { time: '5d', value: parseFloat(calculatePercentageChance(prediction.yes_ada, prediction.no_ada).toFixed(2)) },
+    ];
+  };
+
+  const getProgressColor = (percentage: number) => {
+    if (percentage > 50) {
+      // Green gradient from 50% to 100%
+      const intensity = Math.round(((percentage - 50) / 50) * 255);
+      return `rgb(0, ${intensity}, 0)`;
+    } else {
+      // Red gradient from 0% to 50%
+      const intensity = Math.round(((50 - percentage) / 50) * 255);
+      return `rgb(${intensity}, 0, 0)`;
+    }
+  };
+
+  const getTimeToEnding = (endDate: string) => {
+    const now = new Date();
+    const end = endOfDay(new Date(endDate));
+    const daysLeft = differenceInDays(end, now);
+    const hoursLeft = differenceInHours(end, now) % 24;
+    const minutesLeft = differenceInMinutes(end, now) % 60;
+    const secondsLeft = differenceInSeconds(end, now) % 60;
+
+    if (daysLeft > 1) {
+      return `${daysLeft}d ${hoursLeft}h left`;
+    } else if (daysLeft === 1) {
+      return `1d ${hoursLeft}h left`;
+    } else if (hoursLeft > 0) {
+      return `${hoursLeft}h ${minutesLeft}m ${secondsLeft}s left`;
+    } else if (minutesLeft > 0) {
+      return `${minutesLeft}m ${secondsLeft}s left`;
+    } else if (secondsLeft > 0) {
+      return `${secondsLeft}s left`;
+    } else {
+      return 'Ended';
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-[#000033] text-white relative">
       <GridPattern
@@ -263,32 +317,55 @@ const AdaBetsPage: React.FC = () => {
           </div>
         </div>
         <div className="container mx-auto px-4 mt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {predictions.map((prediction) => (
-              <div 
-                key={prediction.id} 
-                className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors cursor-pointer"
-                onClick={() => handlePredictionClick(prediction)}
-              >
-                <h3 className="text-lg font-semibold mb-2">{prediction.title}</h3>
-                <p className="mb-2">{prediction.content}</p>
-                <p className="text-sm mb-1">End Date: {prediction.end_date}</p>
-                <p className="text-sm mb-1">Yes: {prediction.yes_ada} ADA</p>
-                <p className="text-sm mb-1">No: {prediction.no_ada} ADA</p>
-                <p className="text-sm mb-2">Ratio: {calculateRatio(prediction.yes_ada, prediction.no_ada)}</p>
-                <div className="mt-4">
-                  <ShinyButton
-                    text="View Details"
-                    color={prediction.color}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePredictionClick(prediction);
-                    }}
-                    className="w-full px-4 py-2 rounded hover:opacity-90 transition-opacity"
-                  />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {predictions.map((prediction) => {
+              const percentageChance = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
+              const progressColor = getProgressColor(percentageChance);
+              const timeToEnding = getTimeToEnding(prediction.end_date);
+              const daysLeft = differenceInDays(endOfDay(new Date(prediction.end_date)), new Date());
+              const isEnded = isPast(endOfDay(new Date(prediction.end_date)));
+              return (
+                <div 
+                  key={prediction.id} 
+                  className={`bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors cursor-pointer ${isEnded ? 'opacity-75' : ''}`}
+                  onClick={() => handlePredictionClick(prediction)}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="text-lg font-semibold w-3/4">{prediction.title}</h3>
+                    <div className="w-1/4 max-w-[80px]">
+                      <CircularProgressbar
+                        value={percentageChance}
+                        text={`${percentageChance.toFixed(0)}%`}
+                        styles={buildStyles({
+                          textSize: '22px',
+                          pathColor: progressColor,
+                          textColor: 'white',
+                          trailColor: '#d6d6d6',
+                        })}
+                      />
+                    </div>
+                  </div>
+                  <p className="mb-2 text-sm text-gray-400">{prediction.content}</p>
+                  <div className="h-20 mb-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={generateChartData(prediction)}>
+                        <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-green-500">Yes: {prediction.yes_ada.toFixed(2)} ADA</span>
+                    <span className="text-red-500">No: {prediction.no_ada.toFixed(2)} ADA</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Volume: {(prediction.yes_ada + prediction.no_ada).toFixed(2)} ADA</span>
+                    <span className={`${isEnded ? 'text-red-500 font-bold' : daysLeft <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
+                      {isEnded ? 'Ended' : timeToEnding}
+                    </span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
         {showPopup && <BetPopup onClose={() => setShowPopup(false)} />}

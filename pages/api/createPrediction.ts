@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { endOfDay } from 'date-fns';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -15,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .insert({
           title,
           content,
-          end_date: endDate,
+          end_date: endOfDay(new Date(endDate)).toISOString(),
           initial_stake: initialStake,
           creator_wallet_address: creatorWalletAddress,
           yes_ada: initialStake,
