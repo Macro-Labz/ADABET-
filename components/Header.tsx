@@ -25,7 +25,7 @@ const Header: React.FC<HeaderProps> = ({ borderThickness = 2 }) => {
   const buttonHref = isProfilePage ? '/adabets' : '/profile';
 
   useEffect(() => {
-    const createUserIfNeeded = async () => {
+    const handleUserLogin = async () => {
       if (connected && wallet) {
         try {
           const walletAddress = await wallet.getChangeAddress();
@@ -39,23 +39,26 @@ const Header: React.FC<HeaderProps> = ({ borderThickness = 2 }) => {
 
           if (!existingUser) {
             // Insert new user
-            const { data, error } = await supabase
+            await supabase
               .from('users')
-              .insert({ wallet_address: walletAddress })
-              .single();
-
-            if (error) throw error;
-            console.log('New user created:', data);
+              .insert({ wallet_address: walletAddress, last_login: new Date().toISOString() });
           } else {
-            console.log('User already exists:', existingUser);
+            // Update last login
+            await fetch('/api/updateLastLogin', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({ walletAddress }),
+            });
           }
         } catch (error) {
-          console.error('Error creating/checking user:', error);
+          console.error('Error handling user login:', error);
         }
       }
     };
 
-    createUserIfNeeded();
+    handleUserLogin();
   }, [connected, wallet]);
 
   return (

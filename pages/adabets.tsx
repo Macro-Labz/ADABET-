@@ -40,11 +40,12 @@ interface Bet {
 // Update the Comment interface
 interface Comment {
   id: number;
+  prediction_id: number;
+  user_wallet_address: string;
   content: string;
-  timestamp: string;
+  created_at: string;
   upvotes: number;
   downvotes: number;
-  userVote?: 'up' | 'down';
 }
 
 // Update this function in the AdaBetsPage component
@@ -97,10 +98,11 @@ const AdaBetsPage: React.FC = () => {
             ...(pred.bets || []),
             {
               id: Date.now(),
-              user: 'Current User', // Replace with actual user data when available
+              prediction_id: predictionId, // Added prediction_id
+              user_wallet_address: 'Current User', // Replace with actual user data when available
               amount: amount,
-              type: betType,
-              timestamp: new Date().toISOString(),
+              bet_type: betType, // Added bet_type
+              created_at: new Date().toISOString(), // Added created_at
             },
           ],
         };
@@ -143,62 +145,61 @@ const AdaBetsPage: React.FC = () => {
   // Update the Comment interface
   interface Comment {
     id: number;
+    prediction_id: number;
+    user_wallet_address: string;
     content: string;
-    timestamp: string;
+    created_at: string;
     upvotes: number;
     downvotes: number;
-    userVote?: 'up' | 'down';
   }
 
   // Update the handleAddComment function
-  const handleAddComment = (predictionId: number, commentContent: string) => {
-    setPredictions(predictions.map(pred => {
-      if (pred.id === predictionId) {
-        const newComment: Comment = {
-          id: Date.now(),
+  const handleAddComment = async (predictionId: number, commentContent: string) => {
+    if (!wallet) {
+      console.error('Wallet not connected');
+      return;
+    }
+
+    try {
+      const walletAddress = await wallet.getChangeAddress();
+      const response = await fetch('/api/createComment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          predictionId,
+          userWalletAddress: walletAddress,
           content: commentContent,
-          timestamp: new Date().toISOString(),
-          upvotes: 0,
-          downvotes: 0,
-        };
-        const updatedPrediction = {
-          ...pred,
-          comments: [newComment, ...pred.comments],
-        };
-        setSelectedPrediction(updatedPrediction);
-        return updatedPrediction;
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to add comment');
       }
-      return pred;
-    }));
+
+      const data = await response.json();
+      
+      setPredictions(predictions.map(pred => {
+        if (pred.id === predictionId) {
+          const updatedPrediction = {
+            ...pred,
+            comments: [data.data, ...pred.comments],
+          };
+          if (selectedPrediction && selectedPrediction.id === predictionId) {
+            setSelectedPrediction(updatedPrediction);
+          }
+          return updatedPrediction;
+        }
+        return pred;
+      }));
+    } catch (error) {
+      console.error('Error adding comment:', error);
+    }
   };
 
-  const handleVoteComment = (predictionId: number, commentId: number, voteType: 'up' | 'down') => {
-    setPredictions(predictions.map(pred => {
-      if (pred.id === predictionId) {
-        const updatedComments = pred.comments.map(comment => {
-          if (comment.id === commentId) {
-            const prevVote = comment.userVote;
-            const newUpvotes = comment.upvotes + (voteType === 'up' ? 1 : 0) - (prevVote === 'up' ? 1 : 0);
-            const newDownvotes = comment.downvotes + (voteType === 'down' ? 1 : 0) - (prevVote === 'down' ? 1 : 0);
-            
-            return {
-              ...comment,
-              upvotes: newUpvotes,
-              downvotes: newDownvotes,
-              userVote: voteType,
-            };
-          }
-          return comment;
-        });
-        const updatedPrediction = {
-          ...pred,
-          comments: updatedComments,
-        };
-        setSelectedPrediction(updatedPrediction);
-        return updatedPrediction;
-      }
-      return pred;
-    }));
+  const handleClosePredictionDetails = () => {
+    setSelectedPrediction(null);
   };
 
   return (
@@ -257,7 +258,6 @@ const AdaBetsPage: React.FC = () => {
                     ? "bg-blue-500 hover:bg-blue-600"
                     : "bg-gray-500 cursor-not-allowed"
                 }`}
-                disabled={!connected}
               />
             )}
           </div>
@@ -267,7 +267,8 @@ const AdaBetsPage: React.FC = () => {
             {predictions.map((prediction) => (
               <div 
                 key={prediction.id} 
-                className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors"
+                className="bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors cursor-pointer"
+                onClick={() => handlePredictionClick(prediction)}
               >
                 <h3 className="text-lg font-semibold mb-2">{prediction.title}</h3>
                 <p className="mb-2">{prediction.content}</p>
@@ -277,9 +278,12 @@ const AdaBetsPage: React.FC = () => {
                 <p className="text-sm mb-2">Ratio: {calculateRatio(prediction.yes_ada, prediction.no_ada)}</p>
                 <div className="mt-4">
                   <ShinyButton
-                    text="BET"
+                    text="View Details"
                     color={prediction.color}
-                    onClick={() => handlePredictionClick(prediction)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePredictionClick(prediction);
+                    }}
                     className="w-full px-4 py-2 rounded hover:opacity-90 transition-opacity"
                   />
                 </div>
@@ -297,11 +301,10 @@ const AdaBetsPage: React.FC = () => {
         {selectedPrediction && (
           <PredictionDetails
             prediction={selectedPrediction}
-            onClose={() => setSelectedPrediction(null)}
+            onClose={handleClosePredictionDetails}
             onBet={handleBet}
-            onAddComment={handleAddComment}
-            onVoteComment={handleVoteComment}
-            wallet={wallet} // Pass the wallet here
+            wallet={wallet}
+            connected={connected}
           />
         )}
       </div>
