@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         })
         .filter((item: any) => item !== null);
 
-      console.log('Processed history data:', history);
+
       res.status(200).json({ history });
     } catch (error) {
       console.error('Error fetching prediction history:', error);

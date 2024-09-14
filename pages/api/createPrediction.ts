@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { endOfDay } from 'date-fns';
+import { parseISO } from 'date-fns';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -8,19 +8,21 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
-    const { title, content, endDate, initialStake, creatorWalletAddress } = req.body;
+    const { title, content, endDate, timeEnds, creatorWalletAddress, tag } = req.body;
 
     try {
+      const endDateTime = parseISO(`${endDate}T${timeEnds}`);
+
       const { data: newPrediction, error } = await supabase
         .from('predictions')
         .insert({
           title,
           content,
-          end_date: endOfDay(new Date(endDate)).toISOString(),
-          initial_stake: initialStake,
+          end_date: endDateTime.toISOString(),
           creator_wallet_address: creatorWalletAddress,
-          yes_ada: initialStake,
+          yes_ada: 0,
           no_ada: 0,
+          tag,
         })
         .select()
         .single();

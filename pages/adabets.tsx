@@ -5,7 +5,7 @@ import Header from '../components/Header';
 import BetPopup from '../components/BetPopup';
 import ShinyButton from '../components/magicui/shiny-button';
 import { GridPattern } from '../components/magicui/animated-grid-pattern';
-import CreateBetForm from '../components/CreateBetForm';
+import CreatePredictionForm from '../components/CreatePredictionForm';
 import PredictionDetails from '../components/PredictionDetails';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -26,12 +26,12 @@ interface Prediction {
   yes_ada: number;
   no_ada: number;
   end_date: string;
-  initial_stake: number;
   creator_wallet_address: string;
   created_at: string;
   bets: Bet[];
   comments: Comment[];
   color: string;
+  tag: string;
 }
 
 // Update the Bet interface
@@ -107,8 +107,7 @@ const AdaBetsPage: React.FC = () => {
         yesAda: pred.yes_ada,
         noAda: pred.no_ada,
         endDate: pred.end_date,
-        initialStake: pred.initial_stake.toString(),
-      })).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+      })).sort((a: Prediction, b: Prediction) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
     } catch (error) {
       console.error('Error fetching predictions:', error);
     }
@@ -212,9 +211,9 @@ const AdaBetsPage: React.FC = () => {
         Transaction ID: ${data.id}`;
 
       showNotification(successMessage, 'success');
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Error placing bet:', error);
-      showNotification(error.message || 'Failed to place bet. Please try again.', 'error');
+      showNotification(error instanceof Error ? error.message : 'Failed to place bet. Please try again.', 'error');
     } finally {
       isSubmittingRef.current = false;
     }
@@ -229,6 +228,7 @@ const AdaBetsPage: React.FC = () => {
   };
 
   const handleNewPrediction = (newPrediction: Prediction) => {
+    console.log('New prediction received:', newPrediction);
     setPredictions([
       {
         ...newPrediction,
@@ -458,7 +458,7 @@ const AdaBetsPage: React.FC = () => {
           </div>
           {showPopup && <BetPopup onClose={() => setShowPopup(false)} />}
           {showCreateForm && (
-            <CreateBetForm
+            <CreatePredictionForm
               onClose={() => setShowCreateForm(false)}
               onSubmit={handleNewPrediction}
             />

@@ -44,7 +44,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw error;
       }
 
-      console.log('Bet created successfully:', data);
+      // Fetch the updated prediction data
+      const { data: updatedPrediction, error: predictionError } = await supabase
+        .from('predictions')
+        .select('yes_ada, no_ada')
+        .eq('id', predictionId)
+        .single();
+
+      if (predictionError) {
+        console.error('Error fetching updated prediction:', predictionError);
+        throw predictionError;
+      }
+
+      // Add a new entry to the prediction_history table
+      const { error: historyError } = await supabase
+        .from('prediction_history')
+        .insert({
+          prediction_id: predictionId,
+          yes_ada: updatedPrediction.yes_ada,
+          no_ada: updatedPrediction.no_ada,
+          timestamp: new Date().toISOString()
+        });
+
+      if (historyError) {
+        console.error('Error updating prediction history:', historyError);
+        throw historyError;
+      }
+
+      console.log('Bet created and history updated successfully:', data);
       res.status(200).json({ status: 'success', data });
     } catch (error: any) {
       console.error('Error creating bet:', error);

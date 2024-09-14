@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
 import { useWallet } from "@meshsdk/react";
-import { parseISO } from 'date-fns';
 
-interface CreateBetFormProps {
+interface CreatePredictionFormProps {
   onClose: () => void;
   onSubmit: (prediction: any) => void;
 }
 
-const CreateBetForm: React.FC<CreateBetFormProps> = ({ onClose, onSubmit }) => {
+const CreatePredictionForm: React.FC<CreatePredictionFormProps> = ({ onClose, onSubmit }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [endDate, setEndDate] = useState('');
   const [timeEnds, setTimeEnds] = useState('');
   const [tag, setTag] = useState('');
-  const [initialStake, setInitialStake] = useState('');
   const { wallet } = useWallet();
+
+  const tags = ['Opinion', 'Price'];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,9 +24,11 @@ const CreateBetForm: React.FC<CreateBetFormProps> = ({ onClose, onSubmit }) => {
       return;
     }
 
-    const walletAddress = await wallet.getChangeAddress();
-
     try {
+      const walletAddress = await wallet.getChangeAddress();
+
+      console.log('Submitting prediction:', { title, content, endDate, timeEnds, creatorWalletAddress: walletAddress, tag });
+
       const response = await fetch('/api/createPrediction', {
         method: 'POST',
         headers: {
@@ -43,15 +45,18 @@ const CreateBetForm: React.FC<CreateBetFormProps> = ({ onClose, onSubmit }) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create prediction');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create prediction');
       }
 
       const data = await response.json();
+      console.log('Prediction created:', data);
       onSubmit(data.prediction);
       onClose();
     } catch (error) {
       console.error('Error creating prediction:', error);
       // Handle error (e.g., show error message to user)
+      alert(`Failed to create prediction: ${error.message}`);
     }
   };
 
@@ -89,22 +94,19 @@ const CreateBetForm: React.FC<CreateBetFormProps> = ({ onClose, onSubmit }) => {
             className="w-full p-2 mb-2 bg-gray-700 rounded"
             required
           />
-          <input
-            type="text"
+          <select
             value={tag}
             onChange={(e) => setTag(e.target.value)}
-            placeholder="Enter a tag"
             className="w-full p-2 mb-2 bg-gray-700 rounded"
             required
-          />
-          <input
-            type="number"
-            placeholder="Initial Stake (ADA)"
-            value={initialStake}
-            onChange={(e) => setInitialStake(e.target.value)}
-            className="w-full p-2 mb-2 bg-gray-700 rounded"
-            required
-          />
+          >
+            <option value="">Select a tag</option>
+            {tags.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
           <div className="flex justify-end">
             <button
               type="button"
@@ -126,4 +128,4 @@ const CreateBetForm: React.FC<CreateBetFormProps> = ({ onClose, onSubmit }) => {
   );
 };
 
-export default CreateBetForm;
+export default CreatePredictionForm;
