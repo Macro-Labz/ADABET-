@@ -38,6 +38,7 @@ const ProfilePage: React.FC = () => {
   const [lifetimeProfitLoss, setLifetimeProfitLoss] = useState<number>(0);
   const [userPredictions, setUserPredictions] = useState<Prediction[]>([]);
   const [userBets, setUserBets] = useState<Bet[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   useEffect(() => {
     if (connected && wallet) {
@@ -141,7 +142,7 @@ const ProfilePage: React.FC = () => {
         duration={5}
       />
       <div className="relative z-10 flex flex-col flex-grow">
-        <Header borderThickness={1} />
+        <Header borderThickness={1} searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
         
         {/* User Profile Title */}
         <div className="container mx-auto px-4 mt-4">

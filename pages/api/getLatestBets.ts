@@ -1,5 +1,5 @@
-import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import type { NextApiRequest, NextApiResponse } from 'next';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
@@ -8,7 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      const { data: latestBets, error } = await supabase
+      const { data: bets, error } = await supabase
         .from('bets')
         .select(`
           id,
@@ -17,9 +17,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           amount,
           bet_type,
           created_at,
-          transaction_id,
           predictions (
-            title
+            id,
+            title,
+            tag
           )
         `)
         .order('created_at', { ascending: false })
@@ -27,23 +28,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (error) throw error;
 
-      console.log('Latest bets fetched:', latestBets);
-
-      const formattedBets = latestBets.map(bet => ({
-        id: bet.id,
-        prediction_id: bet.prediction_id,
-        user_wallet_address: bet.user_wallet_address || 'Anonymous',
-        amount: bet.amount || 0,
-        bet_type: bet.bet_type || 'unknown',
-        created_at: bet.created_at ? new Date(bet.created_at).toISOString() : new Date().toISOString(),
-        prediction_title: bet.predictions?.title || 'Unknown Prediction',
-        transaction_id: bet.transaction_id || 'N/A'
+      const formattedBets = bets.map(bet => ({
+        ...bet,
+        prediction_title: bet.predictions.title,
+        prediction_tag: bet.predictions.tag
       }));
 
       res.status(200).json({ bets: formattedBets });
-    } catch (error) {
-      console.error('Error fetching latest bets:', error);
-      res.status(500).json({ message: 'Error fetching latest bets' });
+    } catch (error: any) {
+      console.error('Error in getLatestBets API:', error);
+      res.status(500).json({ status: 'error', message: error.message || 'Failed to fetch latest bets' });
     }
   } else {
     res.setHeader('Allow', ['GET']);

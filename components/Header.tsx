@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { CardanoWallet, useWallet } from "@meshsdk/react";
@@ -9,6 +9,9 @@ import { createClient } from '@supabase/supabase-js';
 
 interface HeaderProps {
   borderThickness?: number;
+  onSearch?: (searchTerm: string) => void;
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
 }
 
 const supabase = createClient(
@@ -16,7 +19,7 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-const Header: React.FC<HeaderProps> = ({ borderThickness = 2 }) => {
+const Header: React.FC<HeaderProps> = ({ borderThickness = 2, onSearch, searchTerm, setSearchTerm }) => {
   const { connected, wallet } = useWallet();
   const router = useRouter();
   const isProfilePage = router.pathname === '/profile';
@@ -61,6 +64,14 @@ const Header: React.FC<HeaderProps> = ({ borderThickness = 2 }) => {
     handleUserLogin();
   }, [connected, wallet]);
 
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    if (onSearch) {
+      onSearch(value);
+    }
+  };
+
   return (
     <header className="bg-[#000033] text-white relative">
       <div className="p-2 flex items-center justify-between">
@@ -75,8 +86,10 @@ const Header: React.FC<HeaderProps> = ({ borderThickness = 2 }) => {
           </Link>
           <input
             type="search"
-            placeholder="Search..."
+            placeholder="Search predictions..."
             className="w-1/3 px-2 py-1 text-black rounded text-sm"
+            value={searchTerm}
+            onChange={handleSearch}
           />
         </div>
         <div className="flex items-center space-x-4">

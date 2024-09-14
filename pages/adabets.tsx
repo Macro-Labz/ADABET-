@@ -31,7 +31,7 @@ interface Prediction {
   bets: Bet[];
   comments: Comment[];
   color: string;
-  tag: string;
+  tag?: string; // Make tag optional
 }
 
 // Update the Bet interface
@@ -58,6 +58,7 @@ interface Comment {
 
 interface UserBet extends Bet {
   prediction_title: string;
+  prediction_tag?: string;
 }
 
 // Update this function in the AdaBetsPage component
@@ -83,6 +84,8 @@ const AdaBetsPage: React.FC = () => {
   const [latestUserBets, setLatestUserBets] = useState<UserBet[]>([]);
   const [notification, setNotification] = useState<Notification | null>(null);
   const isSubmittingRef = useRef(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPredictions();
@@ -197,6 +200,7 @@ const AdaBetsPage: React.FC = () => {
       const newBet: UserBet = {
         ...data,
         prediction_title: predictions.find(p => p.id === predictionId)?.title || '',
+        prediction_tag: predictions.find(p => p.id === predictionId)?.tag || '',
       };
       setLatestUserBets(prevBets => [newBet, ...prevBets.slice(0, 9)]);
 
@@ -343,6 +347,35 @@ const AdaBetsPage: React.FC = () => {
     }
   };
 
+  const handleSearch = (term: string) => {
+    setSearchTerm(term);
+  };
+
+  const handleTagSelect = (tag: string) => {
+    setSelectedTag(tag === selectedTag ? null : tag);
+  };
+
+  const handleClearFilter = () => {
+    setSelectedTag(null);
+    setSearchTerm('');
+  };
+
+  const filteredPredictions = predictions.filter(prediction =>
+    (selectedTag ? prediction.tag === selectedTag : true) &&
+    (prediction.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    prediction.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (prediction.tag && prediction.tag.toLowerCase().includes(searchTerm.toLowerCase())))
+  );
+
+  const sortedPredictions = filteredPredictions.sort((a, b) => {
+    if (selectedTag === 'Top') {
+      return (b.yes_ada + b.no_ada) - (a.yes_ada + a.no_ada);
+    } else if (selectedTag === 'New') {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+    return 0;
+  });
+
   return (
     <div className="flex flex-col min-h-screen bg-[#000033] text-white relative">
       <GridPattern
@@ -355,40 +388,34 @@ const AdaBetsPage: React.FC = () => {
       />
       <div className="relative z-10 flex">
         <div className="flex-grow">
-          <Header borderThickness={1} />
+          <Header 
+            borderThickness={1} 
+            onSearch={handleSearch} 
+            searchTerm={searchTerm} 
+            setSearchTerm={setSearchTerm}
+          />
           <div className="sticky top-0 z-10 bg-[#000033] shadow-md">
             <div className="flex justify-between items-center py-2 px-4 border-b border-gray-700">
-              <div className="flex overflow-x-auto space-x-2">
-                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                  Top
-                </button>
-                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                  New
-                </button>
-                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                  Crypto Prices
-                </button>
-                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                  Bitcoin
-                </button>
-                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                  Airdrops
-                </button>
-                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                  Ethereum
-                </button>
-                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                  Memecoins
-                </button>
-                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                  Stablecoins
-                </button>
-                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                  Cardano
-                </button>
-                <button className="px-3 py-1 bg-blue-500 rounded-full whitespace-nowrap text-xs hover:bg-blue-600">
-                  More
-                </button>
+              <div className="flex overflow-x-auto space-x-2 items-center">
+                {['Top', 'New', 'Crypto Prices', 'Bitcoin', 'Airdrops', 'Ethereum', 'Memecoins', 'Stablecoins', 'Cardano', 'Opinion', 'Price'].map((tag) => (
+                  <button
+                    key={tag}
+                    className={`px-3 py-1 rounded-full whitespace-nowrap text-xs ${
+                      selectedTag === tag ? 'bg-blue-600' : 'bg-blue-500 hover:bg-blue-600'
+                    }`}
+                    onClick={() => handleTagSelect(tag)}
+                  >
+                    {tag}
+                  </button>
+                ))}
+                {(selectedTag || searchTerm) && (
+                  <button
+                    className="px-3 py-1 rounded-full whitespace-nowrap text-xs bg-red-500 hover:bg-red-600"
+                    onClick={handleClearFilter}
+                  >
+                    Clear Filter
+                  </button>
+                )}
               </div>
               {router.pathname === '/adabets' && (
                 <ShinyButton
@@ -406,7 +433,7 @@ const AdaBetsPage: React.FC = () => {
           </div>
           <div className="container mx-auto px-4 mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {predictions.map((prediction) => {
+              {sortedPredictions.map((prediction) => {
                 const percentageChance = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
                 const progressColor = getProgressColor(percentageChance);
                 const timeToEnding = getTimeToEnding(prediction.end_date);
@@ -419,7 +446,14 @@ const AdaBetsPage: React.FC = () => {
                     onClick={() => handlePredictionClick(prediction)}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <h3 className="text-lg font-semibold w-3/4">{prediction.title}</h3>
+                      <div className="w-3/4">
+                        <h3 className="text-lg font-semibold">{prediction.title}</h3>
+                        {prediction.tag && (
+                          <span className="inline-block bg-blue-500 text-xs font-semibold px-2 py-1 rounded-full mt-1">
+                            {prediction.tag}
+                          </span>
+                        )}
+                      </div>
                       <div className="w-1/4 max-w-[80px]">
                         <CircularProgressbar
                           value={percentageChance}
@@ -477,12 +511,22 @@ const AdaBetsPage: React.FC = () => {
           <h2 className="text-xl font-bold mb-4">Latest Bets</h2>
           <AnimatedList delay={2000}>
             {latestUserBets.map((bet) => (
-              <div key={bet.id} className="bg-gray-800 p-2 rounded mb-2">
+              <div 
+                key={bet.id} 
+                className={`p-2 rounded mb-2 ${
+                  bet.bet_type === 'yes' ? 'bg-green-800' : 'bg-red-800'
+                }`}
+              >
                 <p className="text-sm font-semibold">{bet.prediction_title}</p>
-                <p className="text-xs text-gray-400">
-                  {bet.bet_type ? bet.bet_type.toUpperCase() : 'UNKNOWN'} - {bet.amount} ADA
+                {bet.prediction_tag && (
+                  <span className="inline-block bg-blue-500 text-xs font-semibold px-2 py-1 rounded-full mt-1 mb-1">
+                    {bet.prediction_tag}
+                  </span>
+                )}
+                <p className="text-xs text-gray-300">
+                  {bet.bet_type.toUpperCase()} - {bet.amount} ADA
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-400">
                   {new Date(bet.created_at).toLocaleString()}
                 </p>
               </div>

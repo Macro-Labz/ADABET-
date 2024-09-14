@@ -44,8 +44,9 @@ export default function HomePage() {
           duration={5}
         />
         <div className="relative z-10 flex flex-col min-h-screen">
-          <Header borderThickness={1} />
-
+          <Header borderThickness={1} searchTerm={""} setSearchTerm={() => {}} />
+          {/* Add appropriate values for searchTerm and setSearchTerm */}
+          
           <main className={`flex-grow flex flex-col items-center justify-center p-24 ${inter.className}`}>
             <BlurIn
               word="Welcome to ADA BETS"
