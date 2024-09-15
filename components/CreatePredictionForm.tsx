@@ -56,7 +56,7 @@ const CreatePredictionForm: React.FC<CreatePredictionFormProps> = ({ onClose, on
     } catch (error) {
       console.error('Error creating prediction:', error);
       // Handle error (e.g., show error message to user)
-      alert(`Failed to create prediction: ${error.message}`);
+      alert(`Failed to create prediction: ${(error as Error).message}`);
     }
   };
 

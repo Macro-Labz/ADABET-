@@ -36,7 +36,7 @@ interface PredictionDetailsProps {
     created_at: string;
   };
   onClose: () => void;
-  onBet: (predictionId: number, betType: 'yes' | 'no', amount: number) => void;
+  //onBet: (predictionId: number, betType: 'yes' | 'no', amount: number) => void;
   wallet: any;
   connected: boolean;
 }
@@ -67,7 +67,7 @@ const styles = `
 const PredictionDetails: React.FC<PredictionDetailsProps> = ({ 
   prediction, 
   onClose, 
-  onBet,
+  //onBet,
   wallet,
   connected
 }) => {
@@ -199,7 +199,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
       }
 
       const data = await response.json();
-      onBet(prediction.id, type, amount);
+      //onBet(prediction.id, type, amount);
       setBetAmount('');
       setNewBetId(data.data.id);
       setTimeout(() => setNewBetId(null), 5000); // Clear new bet highlight after 5 seconds

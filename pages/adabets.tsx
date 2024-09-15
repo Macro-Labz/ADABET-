@@ -145,7 +145,7 @@ const AdaBetsPage: React.FC = () => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 7000); // Clear notification after 7 seconds
   };
-
+{/*}
   const handleBet = async (predictionId: number, betType: 'yes' | 'no', amount: number) => {
     if (!connected || !wallet) {
       showNotification("Please connect your wallet to place a bet.", 'error');
@@ -234,7 +234,7 @@ const AdaBetsPage: React.FC = () => {
       isSubmittingRef.current = false;
     }
   };
-
+*/}
   const handleCreateBet = () => {
     if (connected) {
       setShowCreateForm(true);
@@ -591,7 +591,7 @@ const AdaBetsPage: React.FC = () => {
             <PredictionDetails
               prediction={selectedPrediction}
               onClose={handleClosePredictionDetails}
-              onBet={handleBet}
+              //onBet={handleBet}
               wallet={wallet}
               connected={connected}
             />

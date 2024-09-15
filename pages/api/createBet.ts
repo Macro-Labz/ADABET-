@@ -5,6 +5,9 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// Create a simple in-memory cache to store recent bets
+const recentBets = new Map<string, number>();
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
     const { predictionId, userWalletAddress, amount, betType } = req.body;
@@ -12,26 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('Received bet request:', { predictionId, userWalletAddress, amount, betType });
 
     try {
-      // Check if a bet already exists
-      const { data: existingBet, error: checkError } = await supabase
-        .from('bets')
-        .select('id')
-        .eq('prediction_id', predictionId)
-        .eq('user_wallet_address', userWalletAddress)
-        .eq('amount', amount)
-        .eq('bet_type', betType)
-        .single();
-
-      if (checkError && checkError.code !== 'PGRST116') {
-        throw checkError;
-      }
-
-      if (existingBet) {
-        console.log('Bet already exists:', existingBet);
-        return res.status(200).json({ status: 'success', data: existingBet, message: 'Bet already exists' });
-      }
-
-      // If no existing bet, create a new one
+      // Create a new bet
       const { data, error } = await supabase.rpc('create_bet_and_update_prediction', {
         p_prediction_id: predictionId,
         p_user_wallet_address: userWalletAddress,
@@ -43,6 +27,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.error('Error in create_bet_and_update_prediction:', error);
         throw error;
       }
+
+      // Fetch the newly created bet
+      const { data: newBet, error: fetchError } = await supabase
+        .from('bets')
+        .select('*')
+        .eq('prediction_id', predictionId)
+        .eq('user_wallet_address', userWalletAddress)
+        .eq('amount', amount)
+        .eq('bet_type', betType)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (fetchError) {
+        console.error('Error fetching new bet:', fetchError);
+        throw fetchError;
+      }
+
+      console.log('New bet created:', newBet);
 
       // Fetch the updated prediction data
       const { data: updatedPrediction, error: predictionError } = await supabase
@@ -71,8 +74,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw historyError;
       }
 
-      console.log('Bet created and history updated successfully:', data);
-      res.status(200).json({ status: 'success', data });
+      console.log('New bet created and history updated successfully:', newBet);
+      res.status(200).json({ status: 'success', data: newBet });
     } catch (error: any) {
       console.error('Error creating bet:', error);
       res.status(500).json({ status: 'error', message: error.message });
