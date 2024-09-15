@@ -142,11 +142,16 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
     }
   };
 
+  useEffect(() => {
+    fetchRecentBets();
+  }, [prediction.id]);
+
   const fetchRecentBets = async () => {
     try {
       const response = await fetch(`/api/getRecentBets?predictionId=${prediction.id}`);
       if (!response.ok) throw new Error('Failed to fetch recent bets');
       const data = await response.json();
+      console.log('Recent bets for prediction:', data.bets);
       setRecentBets(data.bets);
     } catch (error) {
       console.error('Error fetching recent bets:', error);
@@ -198,6 +203,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
       setBetAmount('');
       setNewBetId(data.data.id);
       setTimeout(() => setNewBetId(null), 5000); // Clear new bet highlight after 5 seconds
+      fetchRecentBets(); // Fetch recent bets after successful bet placement
     } catch (error) {
       console.error('Error placing bet:', error);
       alert('Failed to place bet. Please try again.');

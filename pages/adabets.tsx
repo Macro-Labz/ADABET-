@@ -92,12 +92,13 @@ const AdaBetsPage: React.FC = () => {
   useEffect(() => {
     fetchPredictions();
     fetchLatestUserBets();
-  }, []);
 
-  // Add polling for latest bets
-  useInterval(() => {
-    fetchLatestUserBets();
-  }, 30000); // Poll every 30 seconds
+    const intervalId = setInterval(() => {
+      fetchLatestUserBets();
+    }, 30000); // Fetch every 30 seconds
+
+    return () => clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -133,6 +134,7 @@ const AdaBetsPage: React.FC = () => {
         throw new Error('Failed to fetch latest bets');
       }
       const data = await response.json();
+      console.log('Latest user bets:', data.bets);
       setLatestUserBets(data.bets);
     } catch (error) {
       console.error('Error fetching latest bets:', error);
@@ -206,7 +208,7 @@ const AdaBetsPage: React.FC = () => {
         }));
       }
 
-      // Immediately add the new bet to latestUserBets
+      // After successful bet placement
       const newBet: UserBet = {
         ...data,
         prediction_title: predictions.find(p => p.id === predictionId)?.title || '',
@@ -612,7 +614,7 @@ const AdaBetsPage: React.FC = () => {
                   </span>
                 )}
                 <p className="text-xs text-gray-300">
-                  {bet.bet_type.toUpperCase()} - {bet.amount} ADA
+                  {bet.bet_type ? bet.bet_type.toUpperCase() : 'UNKNOWN'} - {bet.amount} ADA
                 </p>
                 <p className="text-xs text-gray-400">
                   {new Date(bet.created_at).toLocaleString()}
