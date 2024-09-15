@@ -88,7 +88,6 @@ const AdaBetsPage: React.FC = () => {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [, updateState] = useState({});
   const forceUpdate = useCallback(() => updateState({}), []);
-  const [sortStatus, setSortStatus] = useState<'all' | 'active' | 'complete'>('all');
 
   useEffect(() => {
     fetchPredictions();
@@ -372,24 +371,16 @@ const AdaBetsPage: React.FC = () => {
     setSearchTerm('');
   };
 
-  const handleSortStatusChange = (status: 'all' | 'active' | 'complete') => {
-    setSortStatus(status);
-  };
+  const activePredictions = predictions.filter(prediction => new Date(prediction.end_date) > new Date());
+  const completedPredictions = predictions.filter(prediction => new Date(prediction.end_date) <= new Date());
 
-  const filteredAndSortedPredictions = predictions
-    .filter(prediction =>
+  const filterPredictions = (preds: Prediction[]) => 
+    preds.filter(prediction =>
       (selectedTag ? prediction.tag === selectedTag : true) &&
       (prediction.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       prediction.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (prediction.tag && prediction.tag.toLowerCase().includes(searchTerm.toLowerCase())))
-    )
-    .filter(prediction => {
-      const isEnded = new Date(prediction.end_date) < new Date();
-      if (sortStatus === 'active') return !isEnded;
-      if (sortStatus === 'complete') return isEnded;
-      return true;
-    })
-    .sort((a, b) => {
+    ).sort((a, b) => {
       if (selectedTag === 'Top') {
         return (b.yes_ada + b.no_ada) - (a.yes_ada + a.no_ada);
       } else if (selectedTag === 'New') {
@@ -397,6 +388,9 @@ const AdaBetsPage: React.FC = () => {
       }
       return 0;
     });
+
+  const filteredActivePredictions = filterPredictions(activePredictions);
+  const filteredCompletedPredictions = filterPredictions(completedPredictions);
 
   return (
     <div className="flex flex-col min-h-screen bg-[#000033] text-white relative">
@@ -430,43 +424,16 @@ const AdaBetsPage: React.FC = () => {
                     {tag}
                   </button>
                 ))}
-                {(selectedTag || searchTerm || sortStatus !== 'all') && (
+                {(selectedTag || searchTerm) && (
                   <button
                     className="px-3 py-1 rounded-full whitespace-nowrap text-xs bg-red-500 hover:bg-red-600"
                     onClick={() => {
                       handleClearFilter();
-                      setSortStatus('all');
                     }}
                   >
                     Clear Filter
                   </button>
                 )}
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  className={`px-3 py-1 rounded-full whitespace-nowrap text-xs ${
-                    sortStatus === 'all' ? 'bg-blue-600' : 'bg-blue-500 hover:bg-blue-600'
-                  }`}
-                  onClick={() => handleSortStatusChange('all')}
-                >
-                  All
-                </button>
-                <button
-                  className={`px-3 py-1 rounded-full whitespace-nowrap text-xs ${
-                    sortStatus === 'active' ? 'bg-green-600' : 'bg-green-500 hover:bg-green-600'
-                  }`}
-                  onClick={() => handleSortStatusChange('active')}
-                >
-                  Active
-                </button>
-                <button
-                  className={`px-3 py-1 rounded-full whitespace-nowrap text-xs ${
-                    sortStatus === 'complete' ? 'bg-purple-600' : 'bg-purple-500 hover:bg-purple-600'
-                  }`}
-                  onClick={() => handleSortStatusChange('complete')}
-                >
-                  Complete
-                </button>
               </div>
               {router.pathname === '/adabets' && (
                 <ShinyButton
@@ -483,8 +450,9 @@ const AdaBetsPage: React.FC = () => {
             </div>
           </div>
           <div className="container mx-auto px-4 mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredAndSortedPredictions.map((prediction) => {
+            <h2 className="text-2xl font-bold mb-4">Active Predictions</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+              {filteredActivePredictions.map((prediction) => {
                 const percentageChance = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
                 const progressColor = getProgressColor(percentageChance);
                 const timeToEnding = getTimeToEnding(prediction.end_date);
@@ -500,10 +468,72 @@ const AdaBetsPage: React.FC = () => {
                       <div className="w-3/4">
                         <div className="flex items-center space-x-2 mb-1">
                           <h3 className="text-lg font-semibold">{prediction.title}</h3>
-                          <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                            isEnded ? 'bg-purple-500 text-white' : 'bg-green-500 text-white'
-                          }`}>
-                            {isEnded ? 'Complete' : 'Active'}
+                          <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-500 text-white">
+                            Active
+                          </span>
+                        </div>
+                        {prediction.tag && (
+                          <span className="inline-block bg-blue-500 text-xs font-semibold px-2 py-1 rounded-full mt-1">
+                            {prediction.tag}
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-1/4 max-w-[80px]">
+                        <CircularProgressbar
+                          value={percentageChance}
+                          text={`${percentageChance.toFixed(0)}%`}
+                          styles={buildStyles({
+                            textSize: '22px',
+                            pathColor: progressColor,
+                            textColor: 'white',
+                            trailColor: '#d6d6d6',
+                          })}
+                        />
+                      </div>
+                    </div>
+                    <p className="mb-2 text-sm text-gray-400">{prediction.content}</p>
+                    <div className="h-20 mb-2">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={generateChartData(prediction)}>
+                          <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-green-500">Yes: {prediction.yes_ada.toFixed(2)} ADA</span>
+                      <span className="text-red-500">No: {prediction.no_ada.toFixed(2)} ADA</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Volume: {(prediction.yes_ada + prediction.no_ada).toFixed(2)} ADA</span>
+                      <span className={`${isEnded ? 'text-red-500 font-bold' : daysLeft <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
+                        {isEnded ? 'Ended' : timeToEnding}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <h2 className="text-2xl font-bold mb-4">Completed Predictions</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredCompletedPredictions.map((prediction) => {
+                const percentageChance = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
+                const progressColor = getProgressColor(percentageChance);
+                const timeToEnding = getTimeToEnding(prediction.end_date);
+                const daysLeft = differenceInDays(parseISO(prediction.end_date), new Date());
+                const isEnded = new Date(prediction.end_date) < new Date();
+                return (
+                  <div 
+                    key={prediction.id} 
+                    className={`bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors cursor-pointer ${isEnded ? 'opacity-75' : ''} ${prediction.id === newBetId ? 'animate-slide-in' : ''}`}
+                    onClick={() => handlePredictionClick(prediction)}
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="w-3/4">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h3 className="text-lg font-semibold">{prediction.title}</h3>
+                          <span className="text-xs font-semibold px-2 py-1 rounded-full bg-purple-500 text-white">
+                            Complete
                           </span>
                         </div>
                         {prediction.tag && (
