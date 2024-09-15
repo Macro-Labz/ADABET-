@@ -88,6 +88,7 @@ const AdaBetsPage: React.FC = () => {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [, updateState] = useState({});
   const forceUpdate = useCallback(() => updateState({}), []);
+  const [sortStatus, setSortStatus] = useState<'all' | 'active' | 'complete'>('all');
 
   useEffect(() => {
     fetchPredictions();
@@ -371,21 +372,31 @@ const AdaBetsPage: React.FC = () => {
     setSearchTerm('');
   };
 
-  const filteredPredictions = predictions.filter(prediction =>
-    (selectedTag ? prediction.tag === selectedTag : true) &&
-    (prediction.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    prediction.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (prediction.tag && prediction.tag.toLowerCase().includes(searchTerm.toLowerCase())))
-  );
+  const handleSortStatusChange = (status: 'all' | 'active' | 'complete') => {
+    setSortStatus(status);
+  };
 
-  const sortedPredictions = filteredPredictions.sort((a, b) => {
-    if (selectedTag === 'Top') {
-      return (b.yes_ada + b.no_ada) - (a.yes_ada + a.no_ada);
-    } else if (selectedTag === 'New') {
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    }
-    return 0;
-  });
+  const filteredAndSortedPredictions = predictions
+    .filter(prediction =>
+      (selectedTag ? prediction.tag === selectedTag : true) &&
+      (prediction.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      prediction.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (prediction.tag && prediction.tag.toLowerCase().includes(searchTerm.toLowerCase())))
+    )
+    .filter(prediction => {
+      const isEnded = new Date(prediction.end_date) < new Date();
+      if (sortStatus === 'active') return !isEnded;
+      if (sortStatus === 'complete') return isEnded;
+      return true;
+    })
+    .sort((a, b) => {
+      if (selectedTag === 'Top') {
+        return (b.yes_ada + b.no_ada) - (a.yes_ada + a.no_ada);
+      } else if (selectedTag === 'New') {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+      return 0;
+    });
 
   return (
     <div className="flex flex-col min-h-screen bg-[#000033] text-white relative">
@@ -419,14 +430,43 @@ const AdaBetsPage: React.FC = () => {
                     {tag}
                   </button>
                 ))}
-                {(selectedTag || searchTerm) && (
+                {(selectedTag || searchTerm || sortStatus !== 'all') && (
                   <button
                     className="px-3 py-1 rounded-full whitespace-nowrap text-xs bg-red-500 hover:bg-red-600"
-                    onClick={handleClearFilter}
+                    onClick={() => {
+                      handleClearFilter();
+                      setSortStatus('all');
+                    }}
                   >
                     Clear Filter
                   </button>
                 )}
+              </div>
+              <div className="flex space-x-2">
+                <button
+                  className={`px-3 py-1 rounded-full whitespace-nowrap text-xs ${
+                    sortStatus === 'all' ? 'bg-blue-600' : 'bg-blue-500 hover:bg-blue-600'
+                  }`}
+                  onClick={() => handleSortStatusChange('all')}
+                >
+                  All
+                </button>
+                <button
+                  className={`px-3 py-1 rounded-full whitespace-nowrap text-xs ${
+                    sortStatus === 'active' ? 'bg-green-600' : 'bg-green-500 hover:bg-green-600'
+                  }`}
+                  onClick={() => handleSortStatusChange('active')}
+                >
+                  Active
+                </button>
+                <button
+                  className={`px-3 py-1 rounded-full whitespace-nowrap text-xs ${
+                    sortStatus === 'complete' ? 'bg-purple-600' : 'bg-purple-500 hover:bg-purple-600'
+                  }`}
+                  onClick={() => handleSortStatusChange('complete')}
+                >
+                  Complete
+                </button>
               </div>
               {router.pathname === '/adabets' && (
                 <ShinyButton
@@ -444,7 +484,7 @@ const AdaBetsPage: React.FC = () => {
           </div>
           <div className="container mx-auto px-4 mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {sortedPredictions.map((prediction) => {
+              {filteredAndSortedPredictions.map((prediction) => {
                 const percentageChance = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
                 const progressColor = getProgressColor(percentageChance);
                 const timeToEnding = getTimeToEnding(prediction.end_date);
@@ -458,7 +498,14 @@ const AdaBetsPage: React.FC = () => {
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div className="w-3/4">
-                        <h3 className="text-lg font-semibold">{prediction.title}</h3>
+                        <div className="flex items-center space-x-2 mb-1">
+                          <h3 className="text-lg font-semibold">{prediction.title}</h3>
+                          <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                            isEnded ? 'bg-purple-500 text-white' : 'bg-green-500 text-white'
+                          }`}>
+                            {isEnded ? 'Complete' : 'Active'}
+                          </span>
+                        </div>
                         {prediction.tag && (
                           <span className="inline-block bg-blue-500 text-xs font-semibold px-2 py-1 rounded-full mt-1">
                             {prediction.tag}
