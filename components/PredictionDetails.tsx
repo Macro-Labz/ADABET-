@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Label } from 'recharts';
 import ShinyButton from './magicui/shiny-button';
 import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, parseISO, format } from 'date-fns';
 
@@ -340,6 +340,42 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
     );
   };
 
+  const generateChartData = (bets: Bet[]) => {
+    if (bets.length === 0) {
+      // If no bets, return a flat line at 50%
+      return [
+        { timestamp: new Date(prediction.created_at).getTime(), value: 50 },
+        { timestamp: new Date().getTime(), value: 50 }
+      ];
+    }
+
+    // Sort bets by timestamp
+    const sortedBets = [...bets].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+    let yesTotal = 0;
+    let noTotal = 0;
+    
+    return sortedBets.map(bet => {
+      if (bet.bet_type === 'yes') {
+        yesTotal += bet.amount;
+      } else {
+        noTotal += bet.amount;
+      }
+      const total = yesTotal + noTotal;
+      const yesPercentage = total > 0 ? (yesTotal / total) * 100 : 50;
+      
+      return {
+        timestamp: new Date(bet.created_at).getTime(),
+        value: yesPercentage
+      };
+    });
+  };
+
+  useEffect(() => {
+    const data = generateChartData(prediction.bets);
+    setChartData(data);
+  }, [prediction.bets]);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <style>{styles}</style>
@@ -358,25 +394,47 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
           
           <div className="mb-6 h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
+              <LineChart 
+                data={chartData} 
+                style={{ backgroundColor: 'black' }}
+                margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
+              >
                 <XAxis 
                   dataKey="timestamp" 
                   tickFormatter={(tick) => format(new Date(tick), 'MM/dd HH:mm')}
                   type="number"
                   domain={['dataMin', 'dataMax']}
-                />
+                  tick={{ fill: '#888888' }}
+                  axisLine={{ stroke: '#333333' }}
+                >
+                  <Label 
+                    value="Time" 
+                    position="bottom" 
+                    offset={10}
+                    style={{ fill: '#888888' }}
+                  />
+                </XAxis>
                 <YAxis 
                   domain={[0, 100]} 
                   allowDataOverflow={true}
-                />
+                  tick={{ fill: '#888888' }}
+                  axisLine={{ stroke: '#333333' }}
+                >
+                  <Label 
+                    value="% Odds" 
+                    angle={-90} 
+                    position="insideLeft" 
+                    style={{ textAnchor: 'middle', fill: '#888888' }}
+                  />
+                </YAxis>
                 <Tooltip 
                   labelFormatter={(label) => format(new Date(label), 'yyyy-MM-dd HH:mm:ss')}
                   formatter={(value: number) => [`${value.toFixed(2)}%`, 'Probability']}
+                  contentStyle={{ backgroundColor: '#1a1a1a', border: 'none' }}
+                  labelStyle={{ color: '#888888' }}
                 />
-                <Legend />
                 <Line 
-                  type="monotone" 
+                  type="stepAfter"
                   dataKey="value" 
                   stroke="#8884d8" 
                   strokeWidth={2} 
