@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Header from '../components/Header';
 import BetPopup from '../components/BetPopup';
 import ShinyButton from '../components/magicui/shiny-button';
@@ -13,7 +13,7 @@ import { useWallet } from "@meshsdk/react";
 import { LineChart, Line, ResponsiveContainer } from 'recharts';
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
-import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, endOfDay, isPast } from 'date-fns';
+import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, parseISO, addDays } from 'date-fns';
 import { AnimatedList } from '../components/magicui/animated-list';
 import { useInterval } from '../hooks/useInterval'; // Create this custom hook
 import { AnimatePresence, motion } from 'framer-motion';
@@ -86,6 +86,8 @@ const AdaBetsPage: React.FC = () => {
   const isSubmittingRef = useRef(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [, updateState] = useState({});
+  const forceUpdate = useCallback(() => updateState({}), []);
 
   useEffect(() => {
     fetchPredictions();
@@ -96,6 +98,14 @@ const AdaBetsPage: React.FC = () => {
   useInterval(() => {
     fetchLatestUserBets();
   }, 30000); // Poll every 30 seconds
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      forceUpdate();
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [forceUpdate]);
 
   const fetchPredictions = async () => {
     try {
@@ -326,7 +336,8 @@ const AdaBetsPage: React.FC = () => {
 
   const getTimeToEnding = (endDate: string) => {
     const now = new Date();
-    const end = endOfDay(new Date(endDate));
+    const end = parseISO(endDate);
+  
     const daysLeft = differenceInDays(end, now);
     const hoursLeft = differenceInHours(end, now) % 24;
     const minutesLeft = differenceInMinutes(end, now) % 60;
@@ -337,7 +348,7 @@ const AdaBetsPage: React.FC = () => {
     } else if (daysLeft === 1) {
       return `1d ${hoursLeft}h left`;
     } else if (hoursLeft > 0) {
-      return `${hoursLeft}h ${minutesLeft}m ${secondsLeft}s left`;
+      return `${hoursLeft}h ${minutesLeft}m left`;
     } else if (minutesLeft > 0) {
       return `${minutesLeft}m ${secondsLeft}s left`;
     } else if (secondsLeft > 0) {
@@ -437,8 +448,8 @@ const AdaBetsPage: React.FC = () => {
                 const percentageChance = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
                 const progressColor = getProgressColor(percentageChance);
                 const timeToEnding = getTimeToEnding(prediction.end_date);
-                const daysLeft = differenceInDays(endOfDay(new Date(prediction.end_date)), new Date());
-                const isEnded = isPast(endOfDay(new Date(prediction.end_date)));
+                const daysLeft = differenceInDays(parseISO(prediction.end_date), new Date());
+                const isEnded = new Date(prediction.end_date) < new Date();
                 return (
                   <div 
                     key={prediction.id} 

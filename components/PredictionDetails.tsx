@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import ShinyButton from './magicui/shiny-button';
-import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, endOfDay, addDays, isPast, format, subMinutes } from 'date-fns';
+import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, parseISO, format } from 'date-fns';
 
 interface Bet {
   id: number;
@@ -288,7 +288,8 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
   const getTimeToEnding = (endDate: string) => {
     const now = new Date();
-    const end = endOfDay(new Date(endDate));
+    const end = parseISO(endDate);
+  
     const daysLeft = differenceInDays(end, now);
     const hoursLeft = differenceInHours(end, now) % 24;
     const minutesLeft = differenceInMinutes(end, now) % 60;
@@ -299,7 +300,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
     } else if (daysLeft === 1) {
       return `1d ${hoursLeft}h left`;
     } else if (hoursLeft > 0) {
-      return `${hoursLeft}h ${minutesLeft}m ${secondsLeft}s left`;
+      return `${hoursLeft}h ${minutesLeft}m left`;
     } else if (minutesLeft > 0) {
       return `${minutesLeft}m ${secondsLeft}s left`;
     } else if (secondsLeft > 0) {
@@ -322,7 +323,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
     return () => clearInterval(intervalId);
   }, [prediction.end_date]);
 
-  const isEnded = isPast(endOfDay(new Date(prediction.end_date)));
+  const isEnded = parseISO(prediction.end_date) < new Date();
 
   const getBetSummary = () => {
     const totalBets = prediction.yes_ada + prediction.no_ada;
@@ -348,7 +349,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
             <h2 className="text-2xl font-bold">{prediction.title}</h2>
             <div className="text-right">
               <span className="text-3xl font-bold text-green-500">{calculatePercentageChance(prediction.yes_ada, prediction.no_ada).toFixed(2)}%</span>
-              <p className={`${differenceInDays(endOfDay(new Date(prediction.end_date)), new Date()) <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
+              <p className={`${differenceInDays(parseISO(prediction.end_date), new Date()) <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
                 {timeRemaining}
               </p>
             </div>
