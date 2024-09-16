@@ -1,0 +1,52 @@
+{
+  "name": "starter-next-ts-template",
+  "description": "A Mesh starter template",
+  "version": "0.1.0",
+  "private": true,
+  "author": "MeshJS",
+  "license": "Apache-2.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push"
+  },
+  "dependencies": {
+    "@meshsdk/core": "^1.5.25",
+    "@meshsdk/react": "^1.7.4",
+    "@prisma/client": "^5.19.1",
+    "@supabase/supabase-js": "^2.45.4",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.0.0-beta.1",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.33.0",
+    "framer-motion": "^11.5.4",
+    "lucide-react": "^0.439.0",
+    "next": "^14.2.9",
+    "pg": "^8.12.0",
+    "postgres": "^3.4.4",
+    "react": "^18.3.1",
+    "react-circular-progressbar": "^2.1.0",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.7",
+    "tailwind-merge": "^2.5.2",
+    "tailwindcss-animate": "^1.0.7"
+  },
+  "devDependencies": {
+    "@next/eslint-plugin-next": "^14.2.3",
+    "@types/eslint": "^8.56.5",
+    "@types/next": "^9.0.0",
+    "@types/node": "^20",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "drizzle-kit": "^0.24.2",
+    "eslint": "^8.57.0",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
+  }
+}
