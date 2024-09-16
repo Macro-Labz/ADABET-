@@ -20,12 +20,30 @@ const supabase = createClient(
 );
 
 const Header: React.FC<HeaderProps> = ({ borderThickness = 2, onSearch, searchTerm, setSearchTerm }) => {
-  const { connected, wallet } = useWallet();
+  const { connected, wallet, connect } = useWallet();
   const router = useRouter();
   const isProfilePage = router.pathname === '/profile';
 
   const buttonText = isProfilePage ? 'BETTING' : 'PROFILE';
   const buttonHref = isProfilePage ? '/adabets' : '/profile';
+
+  useEffect(() => {
+    const autoConnect = async () => {
+      if (!connected) {
+        const wallets = ["vespr", "eternl", "nami"];
+        for (const walletName of wallets) {
+          try {
+            await connect(walletName);
+            break; // Stop if successfully connected
+          } catch (error) {
+            console.log(`Failed to connect to ${walletName}`);
+          }
+        }
+      }
+    };
+
+    autoConnect();
+  }, [connected, connect]);
 
   useEffect(() => {
     const handleUserLogin = async () => {
@@ -104,7 +122,7 @@ const Header: React.FC<HeaderProps> = ({ borderThickness = 2, onSearch, searchTe
               {buttonText}
             </button>
           )}
-          <CardanoWallet />
+          <CardanoWallet isDark={true}/>
         </div>
       </div>
       <div className="bg-white" style={{ height: `${borderThickness}px` }}></div>
