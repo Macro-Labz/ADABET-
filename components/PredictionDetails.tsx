@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Label } from 'recharts';
 import ShinyButton from './magicui/shiny-button';
 import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, parseISO, format, addMinutes } from 'date-fns';
+import { useInterval } from '../hooks/useInterval';
 
 interface Bet {
   id: number;
@@ -64,7 +65,7 @@ const styles = `
 `;
 
 const PredictionDetails: React.FC<PredictionDetailsProps> = ({ 
-  prediction, 
+  prediction: initialPrediction, 
   onClose, 
   wallet,
   connected
@@ -84,10 +85,29 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   const [newBetId, setNewBetId] = useState<number | null>(null);
   const [recentBets, setRecentBets] = useState<Bet[]>([]);
   const [currentPercentage, setCurrentPercentage] = useState<number>(
-    calculatePercentageChance(prediction.yes_ada, prediction.no_ada)
+    calculatePercentageChance(initialPrediction.yes_ada, initialPrediction.no_ada)
   );
 
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+
+  const [predictionData, setPredictionData] = useState({
+    yes_ada: initialPrediction.yes_ada,
+    no_ada: initialPrediction.no_ada,
+  });
+
+  const fetchLatestPredictionData = async () => {
+    try {
+      const response = await fetch(`/api/getLatestPredictionData?predictionId=${initialPrediction.id}`);
+      if (!response.ok) throw new Error('Failed to fetch latest prediction data');
+      const data = await response.json();
+      setPredictionData(data);
+      setCurrentPercentage(calculatePercentageChance(data.yes_ada, data.no_ada));
+    } catch (error) {
+      console.error('Error fetching latest prediction data:', error);
+    }
+  };
+
+  useInterval(fetchLatestPredictionData, 60000); // Fetch data every minute
 
   useEffect(() => {
     const fetchWalletAddress = async () => {
@@ -137,11 +157,11 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
     // Clean up the interval when the component unmounts
     return () => clearInterval(intervalId);
-  }, [prediction.id]);
+  }, [initialPrediction.id]);
 
   const fetchPredictionHistory = async () => {
     try {
-      const response = await fetch(`/api/getPredictionHistory?predictionId=${prediction.id}`);
+      const response = await fetch(`/api/getPredictionHistory?predictionId=${initialPrediction.id}`);
       if (!response.ok) throw new Error('Failed to fetch prediction history');
       const data = await response.json();
       
@@ -167,11 +187,11 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
   useEffect(() => {
     fetchRecentBets();
-  }, [prediction.id]);
+  }, [initialPrediction.id]);
 
   const fetchRecentBets = async () => {
     try {
-      const response = await fetch(`/api/getRecentBets?predictionId=${prediction.id}`);
+      const response = await fetch(`/api/getRecentBets?predictionId=${initialPrediction.id}`);
       if (!response.ok) throw new Error('Failed to fetch recent bets');
       const data = await response.json();
       console.log('Recent bets for prediction:', data.bets);
@@ -183,7 +203,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
   useEffect(() => {
     fetchComments();
-  }, [prediction.id]);
+  }, [initialPrediction.id]);
 
   const handleBet = async (type: 'yes' | 'no') => {
     if (!connected || !walletAddress) {
@@ -204,7 +224,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          predictionId: prediction.id,
+          predictionId: initialPrediction.id,
           userWalletAddress: walletAddress,
           amount,
           betType: type,
@@ -220,6 +240,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
       setNewBetId(data.data.id);
       setTimeout(() => setNewBetId(null), 5000); // Clear new bet highlight after 5 seconds
       fetchRecentBets(); // Fetch recent bets after successful bet placement
+      fetchLatestPredictionData(); // Fetch latest prediction data
     } catch (error) {
       console.error('Error placing bet:', error);
       alert('Failed to place bet. Please try again.');
@@ -228,7 +249,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
   const fetchComments = async () => {
     try {
-      const response = await fetch(`/api/getComments?predictionId=${prediction.id.toString()}`);
+      const response = await fetch(`/api/getComments?predictionId=${initialPrediction.id.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch comments');
       const data = await response.json();
       setComments(data.comments);
@@ -250,7 +271,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          predictionId: prediction.id,
+          predictionId: initialPrediction.id,
           userWalletAddress: walletAddress,
           content: commentContent
         }),
@@ -332,7 +353,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
   useEffect(() => {
     const updateTimeRemaining = () => {
-      setTimeRemaining(getTimeToEnding(prediction.end_date));
+      setTimeRemaining(getTimeToEnding(initialPrediction.end_date));
     };
 
     // Update immediately and then every second
@@ -341,20 +362,20 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
     // Clear the interval when the component unmounts or when the prediction changes
     return () => clearInterval(intervalId);
-  }, [prediction.end_date]);
+  }, [initialPrediction.end_date]);
 
-  const isEnded = parseISO(prediction.end_date) < new Date();
+  const isEnded = parseISO(initialPrediction.end_date) < new Date();
 
   const getBetSummary = () => {
-    const totalBets = prediction.yes_ada + prediction.no_ada;
-    const yesPercentage = (prediction.yes_ada / totalBets) * 100;
-    const noPercentage = (prediction.no_ada / totalBets) * 100;
+    const totalBets = predictionData.yes_ada + predictionData.no_ada;
+    const yesPercentage = (predictionData.yes_ada / totalBets) * 100;
+    const noPercentage = (predictionData.no_ada / totalBets) * 100;
     return (
       <div className="bg-gray-700 p-4 rounded mb-4">
         <h3 className="text-xl font-semibold mb-2">Bet Summary</h3>
         <p>Total bets: {totalBets.toFixed(2)} ADA</p>
-        <p>Yes: {prediction.yes_ada.toFixed(2)} ADA ({yesPercentage.toFixed(2)}%)</p>
-        <p>No: {prediction.no_ada.toFixed(2)} ADA ({noPercentage.toFixed(2)}%)</p>
+        <p>Yes: {predictionData.yes_ada.toFixed(2)} ADA ({yesPercentage.toFixed(2)}%)</p>
+        <p>No: {predictionData.no_ada.toFixed(2)} ADA ({noPercentage.toFixed(2)}%)</p>
         <p>Winner: {yesPercentage > noPercentage ? 'Yes' : 'No'}</p>
       </div>
     );
@@ -366,7 +387,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
     if (bets.length === 0) {
       console.log('No bets, returning flat line at 50%');
       return [
-        { timestamp: new Date(prediction.created_at).getTime(), value: 50 },
+        { timestamp: new Date(initialPrediction.created_at).getTime(), value: 50 },
         { timestamp: new Date().getTime(), value: 50 }
       ];
     }
@@ -401,9 +422,9 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
   useEffect(() => {
     console.log('Prediction bets changed, regenerating chart data');
-    const data = generateChartData(prediction.bets);
+    const data = generateChartData(initialPrediction.bets);
     setChartData(data);
-  }, [prediction.bets]);
+  }, [initialPrediction.bets]);
 
   useEffect(() => {
     const updateChartData = () => {
@@ -429,7 +450,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
   useEffect(() => {
     const calculateCurrentPercentage = () => {
-      const newPercentage = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
+      const newPercentage = calculatePercentageChance(predictionData.yes_ada, predictionData.no_ada);
       console.log(`New percentage calculated: ${newPercentage}`);
       setCurrentPercentage(newPercentage);
     };
@@ -439,7 +460,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
     const intervalId = setInterval(calculateCurrentPercentage, 60000);
 
     return () => clearInterval(intervalId);
-  }, [prediction.yes_ada, prediction.no_ada]);
+  }, [predictionData.yes_ada, predictionData.no_ada]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -447,15 +468,15 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
       <div ref={detailsRef} className="bg-gray-800 rounded-lg w-full max-w-4xl m-4 flex flex-col max-h-[90vh]">
         <div className="p-6 overflow-y-auto flex-grow">
           <div className="flex justify-between items-start mb-4">
-            <h2 className="text-2xl font-bold">{prediction.title}</h2>
+            <h2 className="text-2xl font-bold">{initialPrediction.title}</h2>
             <div className="text-right">
-              <span className="text-3xl font-bold text-green-500">{calculatePercentageChance(prediction.yes_ada, prediction.no_ada).toFixed(2)}%</span>
-              <p className={`${differenceInDays(parseISO(prediction.end_date), new Date()) <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
+              <span className="text-3xl font-bold text-green-500">{currentPercentage.toFixed(2)}%</span>
+              <p className={`${differenceInDays(parseISO(initialPrediction.end_date), new Date()) <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
                 {timeRemaining}
               </p>
             </div>
           </div>
-          <p className="mb-4 text-gray-400">{prediction.content}</p>
+          <p className="mb-4 text-gray-400">{initialPrediction.content}</p>
           
           <div className="mb-6 h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -513,11 +534,11 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="bg-green-900 p-4 rounded">
               <h3 className="text-lg font-semibold mb-2">Yes</h3>
-              <p className="text-2xl font-bold">{prediction.yes_ada} ADA</p>
+              <p className="text-2xl font-bold">{predictionData.yes_ada} ADA</p>
             </div>
             <div className="bg-red-900 p-4 rounded">
               <h3 className="text-lg font-semibold mb-2">No</h3>
-              <p className="text-2xl font-bold">{prediction.no_ada} ADA</p>
+              <p className="text-2xl font-bold">{predictionData.no_ada} ADA</p>
             </div>
           </div>
 
