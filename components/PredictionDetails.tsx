@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Label } from 'recharts';
 import ShinyButton from './magicui/shiny-button';
-import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, parseISO, format } from 'date-fns';
+import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, parseISO, format, addMinutes } from 'date-fns';
 
 interface Bet {
   id: number;
@@ -36,7 +36,6 @@ interface PredictionDetailsProps {
     created_at: string;
   };
   onClose: () => void;
-  //onBet: (predictionId: number, betType: 'yes' | 'no', amount: number) => void;
   wallet: any;
   connected: boolean;
 }
@@ -67,10 +66,14 @@ const styles = `
 const PredictionDetails: React.FC<PredictionDetailsProps> = ({ 
   prediction, 
   onClose, 
-  //onBet,
   wallet,
   connected
 }) => {
+  const calculatePercentageChance = (yesAda: number, noAda: number) => {
+    const total = yesAda + noAda;
+    return total > 0 ? (yesAda / total * 100) : 50;
+  };
+
   const [betAmount, setBetAmount] = useState('');
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [commentContent, setCommentContent] = useState('');
@@ -80,6 +83,26 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   const [timeRemaining, setTimeRemaining] = useState('');
   const [newBetId, setNewBetId] = useState<number | null>(null);
   const [recentBets, setRecentBets] = useState<Bet[]>([]);
+  const [currentPercentage, setCurrentPercentage] = useState<number>(
+    calculatePercentageChance(prediction.yes_ada, prediction.no_ada)
+  );
+
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchWalletAddress = async () => {
+      if (connected && wallet) {
+        try {
+          const address = await wallet.getChangeAddress();
+          setWalletAddress(address);
+        } catch (error) {
+          console.error('Error fetching wallet address:', error);
+        }
+      }
+    };
+
+    fetchWalletAddress();
+  }, [connected, wallet]);
 
   const memeOptions = [
     { url: 'https://example.com/meme1.gif', alt: 'Funny meme 1' },
@@ -158,17 +181,12 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
     }
   };
 
-  const calculatePercentageChance = (yesAda: number, noAda: number) => {
-    const total = yesAda + noAda;
-    return total > 0 ? (yesAda / total * 100) : 50;
-  };
-
   useEffect(() => {
     fetchComments();
   }, [prediction.id]);
 
   const handleBet = async (type: 'yes' | 'no') => {
-    if (!connected) {
+    if (!connected || !walletAddress) {
       alert('Please connect your wallet to place a bet.');
       return;
     }
@@ -180,7 +198,6 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
     }
 
     try {
-      const walletAddress = await wallet.getChangeAddress();
       const response = await fetch('/api/createBet', {
         method: 'POST',
         headers: {
@@ -199,7 +216,6 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
       }
 
       const data = await response.json();
-      //onBet(prediction.id, type, amount);
       setBetAmount('');
       setNewBetId(data.data.id);
       setTimeout(() => setNewBetId(null), 5000); // Clear new bet highlight after 5 seconds
@@ -222,7 +238,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   };
 
   const handleAddComment = async () => {
-    if (!connected) {
+    if (!connected || !walletAddress) {
       alert('Please connect your wallet to add a comment.');
       return;
     }
@@ -230,7 +246,6 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
     if (!commentContent.trim()) return;
 
     try {
-      const walletAddress = await wallet.getChangeAddress();
       const response = await fetch('/api/createComment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -256,13 +271,12 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   };
 
   const handleVote = async (commentId: number, voteType: 'up' | 'down') => {
-    if (!connected) {
+    if (!connected || !walletAddress) {
       alert('Please connect your wallet to vote on comments.');
       return;
     }
 
     try {
-      const walletAddress = await wallet.getChangeAddress();
       const response = await fetch('/api/voteComment', {
         method: 'POST',
         headers: {
@@ -288,8 +302,8 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   };
 
   const getUserVote = (comment: Comment) => {
-    if (!connected || !wallet) return null;
-    return comment.voters?.[wallet.getChangeAddress()] || null;
+    if (!connected || !walletAddress) return null;
+    return comment.voters?.[walletAddress] || null;
   };
 
   const getTimeToEnding = (endDate: string) => {
@@ -347,8 +361,10 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   };
 
   const generateChartData = (bets: Bet[]) => {
+    console.log('Generating chart data from bets:', bets);
+
     if (bets.length === 0) {
-      // If no bets, return a flat line at 50%
+      console.log('No bets, returning flat line at 50%');
       return [
         { timestamp: new Date(prediction.created_at).getTime(), value: 50 },
         { timestamp: new Date().getTime(), value: 50 }
@@ -357,11 +373,12 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
     // Sort bets by timestamp
     const sortedBets = [...bets].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    console.log('Sorted bets:', sortedBets);
 
     let yesTotal = 0;
     let noTotal = 0;
     
-    return sortedBets.map(bet => {
+    const chartData = sortedBets.map(bet => {
       if (bet.bet_type === 'yes') {
         yesTotal += bet.amount;
       } else {
@@ -370,17 +387,59 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
       const total = yesTotal + noTotal;
       const yesPercentage = total > 0 ? (yesTotal / total) * 100 : 50;
       
+      console.log(`Bet: ${bet.bet_type}, Amount: ${bet.amount}, Yes Total: ${yesTotal}, No Total: ${noTotal}, Yes Percentage: ${yesPercentage}`);
+
       return {
         timestamp: new Date(bet.created_at).getTime(),
         value: yesPercentage
       };
     });
+
+    console.log('Generated chart data:', chartData);
+    return chartData;
   };
 
   useEffect(() => {
+    console.log('Prediction bets changed, regenerating chart data');
     const data = generateChartData(prediction.bets);
     setChartData(data);
   }, [prediction.bets]);
+
+  useEffect(() => {
+    const updateChartData = () => {
+      const now = new Date();
+      const newDataPoint = {
+        timestamp: now.getTime(),
+        value: currentPercentage
+      };
+
+      setChartData(prevData => {
+        const newData = [...prevData, newDataPoint];
+        // Keep only the last 60 data points (1 hour of data)
+        return newData.slice(-60);
+      });
+    };
+
+    // Update chart data immediately and then every minute
+    updateChartData();
+    const intervalId = setInterval(updateChartData, 60000);
+
+    return () => clearInterval(intervalId);
+  }, [currentPercentage]);
+
+  useEffect(() => {
+    const calculateCurrentPercentage = () => {
+      const newPercentage = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
+      console.log(`New percentage calculated: ${newPercentage}`);
+      setCurrentPercentage(newPercentage);
+    };
+
+    // Calculate percentage immediately and then every minute
+    calculateCurrentPercentage();
+    const intervalId = setInterval(calculateCurrentPercentage, 60000);
+
+    return () => clearInterval(intervalId);
+  }, [prediction.yes_ada, prediction.no_ada]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -407,7 +466,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
               >
                 <XAxis 
                   dataKey="timestamp" 
-                  tickFormatter={(tick) => format(new Date(tick), 'MM/dd HH:mm')}
+                  tickFormatter={(tick) => format(new Date(tick), 'HH:mm')}
                   type="number"
                   domain={['dataMin', 'dataMax']}
                   tick={{ fill: '#888888' }}
@@ -434,7 +493,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
                   />
                 </YAxis>
                 <Tooltip 
-                  labelFormatter={(label) => format(new Date(label), 'yyyy-MM-dd HH:mm:ss')}
+                  labelFormatter={(label) => format(new Date(label), 'HH:mm:ss')}
                   formatter={(value: number) => [`${value.toFixed(2)}%`, 'Probability']}
                   contentStyle={{ backgroundColor: '#1a1a1a', border: 'none' }}
                   labelStyle={{ color: '#888888' }}
