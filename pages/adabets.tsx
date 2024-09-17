@@ -395,7 +395,7 @@ const AdaBetsPage: React.FC = () => {
   const filteredCompletedPredictions = filterPredictions(completedPredictions);
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#000033] text-white relative">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white relative">
       <GridPattern
         width={40}
         height={40}
@@ -412,7 +412,7 @@ const AdaBetsPage: React.FC = () => {
             searchTerm={searchTerm} 
             setSearchTerm={setSearchTerm}
           />
-          <div className="sticky top-0 z-10 bg-[#000033] shadow-md">
+          <div className="sticky top-0 z-10 bg-gradient-to-br from-gray-900 via-black to-gray-900 shadow-md">
             <div className="flex justify-between items-center py-2 px-4 border-b border-gray-700">
               <div className="flex overflow-x-auto space-x-2 items-center">
                 {['Top', 'New', 'Crypto Prices', 'Bitcoin', 'Airdrops', 'Ethereum', 'Memecoins', 'Stablecoins', 'Cardano', 'Opinion', 'Price'].map((tag) => (
@@ -463,7 +463,13 @@ const AdaBetsPage: React.FC = () => {
                 return (
                   <div 
                     key={prediction.id} 
-                    className={`bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors cursor-pointer ${isEnded ? 'opacity-75' : ''} ${prediction.id === newBetId ? 'animate-slide-in' : ''}`}
+                    className={`
+                      bg-gradient-to-br from-gray-900 via-black to-gray-900
+                      rounded-lg p-4 hover:from-gray-800 hover:via-gray-900 hover:to-gray-800
+                      transition-colors cursor-pointer shadow-lg
+                      ${isEnded ? 'opacity-75' : ''} 
+                      ${prediction.id === newBetId ? 'animate-slide-in' : ''}
+                    `}
                     onClick={() => handlePredictionClick(prediction)}
                   >
                     <div className="flex justify-between items-start mb-2">
@@ -527,7 +533,13 @@ const AdaBetsPage: React.FC = () => {
                 return (
                   <div 
                     key={prediction.id} 
-                    className={`bg-gray-800 rounded-lg p-4 hover:bg-gray-700 transition-colors cursor-pointer ${isEnded ? 'opacity-75' : ''} ${prediction.id === newBetId ? 'animate-slide-in' : ''}`}
+                    className={`
+                      bg-gradient-to-br from-gray-900 via-black to-gray-900
+                      rounded-lg p-4 hover:from-gray-800 hover:via-gray-900 hover:to-gray-800
+                      transition-colors cursor-pointer shadow-lg
+                      ${isEnded ? 'opacity-75' : ''} 
+                      ${prediction.id === newBetId ? 'animate-slide-in' : ''}
+                    `}
                     onClick={() => handlePredictionClick(prediction)}
                   >
                     <div className="flex justify-between items-start mb-2">
@@ -597,7 +609,7 @@ const AdaBetsPage: React.FC = () => {
             />
           )}
         </div>
-        <div className="w-64 bg-gray-900 p-4 overflow-y-auto h-screen sticky top-0">
+        <div className="w-64 bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4 overflow-y-auto h-screen sticky top-0">
           <h2 className="text-xl font-bold mb-4">Latest Bets</h2>
           <AnimatedList delay={2000}>
             {latestUserBets.map((bet) => (
@@ -605,7 +617,7 @@ const AdaBetsPage: React.FC = () => {
                 key={bet.id} 
                 className={`p-2 rounded mb-2 ${
                   bet.bet_type === 'yes' ? 'bg-green-800' : 'bg-red-800'
-                }`}
+                } hover:from-gray-800 hover:via-gray-900 hover:to-gray-800 transition-colors`}
               >
                 <p className="text-sm font-semibold">{bet.prediction_title}</p>
                 {bet.prediction_tag && (

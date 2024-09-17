@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Label } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Label, ReferenceLine } from 'recharts';
 import ShinyButton from './magicui/shiny-button';
 import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, parseISO, format, addMinutes } from 'date-fns';
 import { useInterval } from '../hooks/useInterval';
@@ -37,6 +37,7 @@ interface PredictionDetailsProps {
     created_at: string;
   };
   onClose: () => void;
+  //onBet: (predictionId: number, betType: 'yes' | 'no', amount: number) => void;
   wallet: any;
   connected: boolean;
 }
@@ -382,10 +383,8 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   };
 
   const generateChartData = (bets: Bet[]) => {
-    console.log('Generating chart data from bets:', bets);
-
     if (bets.length === 0) {
-      console.log('No bets, returning flat line at 50%');
+      // If no bets, return a flat line at 50%
       return [
         { timestamp: new Date(initialPrediction.created_at).getTime(), value: 50 },
         { timestamp: new Date().getTime(), value: 50 }
@@ -394,7 +393,6 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
     // Sort bets by timestamp
     const sortedBets = [...bets].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-    console.log('Sorted bets:', sortedBets);
 
     let yesTotal = 0;
     let noTotal = 0;
@@ -465,7 +463,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <style>{styles}</style>
-      <div ref={detailsRef} className="bg-gray-800 rounded-lg w-full max-w-4xl m-4 flex flex-col max-h-[90vh]">
+      <div ref={detailsRef} className="bg-gradient-to-br from-gray-900 via-black to-gray-900 rounded-lg w-full max-w-4xl m-4 flex flex-col max-h-[90vh] shadow-lg">
         <div className="p-6 overflow-y-auto flex-grow">
           <div className="flex justify-between items-start mb-4">
             <h2 className="text-2xl font-bold">{initialPrediction.title}</h2>
@@ -482,47 +480,48 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
             <ResponsiveContainer width="100%" height="100%">
               <LineChart 
                 data={chartData} 
-                style={{ backgroundColor: 'black' }}
+                style={{ backgroundColor: 'black', border: '1px solid white' }}
                 margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
               >
                 <XAxis 
                   dataKey="timestamp" 
-                  tickFormatter={(tick) => format(new Date(tick), 'HH:mm')}
+                  tickFormatter={(tick) => format(new Date(tick), 'MM/dd HH:mm')}
                   type="number"
                   domain={['dataMin', 'dataMax']}
-                  tick={{ fill: '#888888' }}
-                  axisLine={{ stroke: '#333333' }}
+                  tick={{ fill: 'white' }}
+                  axisLine={{ stroke: 'white' }}
                 >
                   <Label 
                     value="Time" 
                     position="bottom" 
                     offset={10}
-                    style={{ fill: '#888888' }}
+                    style={{ fill: 'white' }}
                   />
                 </XAxis>
                 <YAxis 
                   domain={[0, 100]} 
                   allowDataOverflow={true}
-                  tick={{ fill: '#888888' }}
-                  axisLine={{ stroke: '#333333' }}
+                  tick={{ fill: 'white' }}
+                  axisLine={{ stroke: 'white' }}
                 >
                   <Label 
                     value="% Odds" 
                     angle={-90} 
                     position="insideLeft" 
-                    style={{ textAnchor: 'middle', fill: '#888888' }}
+                    style={{ textAnchor: 'middle', fill: 'white' }}
                   />
                 </YAxis>
                 <Tooltip 
-                  labelFormatter={(label) => format(new Date(label), 'HH:mm:ss')}
+                  labelFormatter={(label) => format(new Date(label), 'yyyy-MM-dd HH:mm:ss')}
                   formatter={(value: number) => [`${value.toFixed(2)}%`, 'Probability']}
-                  contentStyle={{ backgroundColor: '#1a1a1a', border: 'none' }}
-                  labelStyle={{ color: '#888888' }}
+                  contentStyle={{ backgroundColor: 'black', border: '1px solid white', color: 'white' }}
+                  labelStyle={{ color: 'white' }}
                 />
+                <ReferenceLine y={50} stroke="#3b82f6" strokeDasharray="3 3" />
                 <Line 
                   type="stepAfter"
                   dataKey="value" 
-                  stroke="#8884d8" 
+                  stroke="#8b5cf6" // Change this line to use a purple color
                   strokeWidth={2} 
                   dot={false}
                   isAnimationActive={false}
@@ -532,13 +531,13 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
           </div>
 
           <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-green-900 p-4 rounded">
+            <div className="bg-green-600 p-4 rounded">
               <h3 className="text-lg font-semibold mb-2">Yes</h3>
-              <p className="text-2xl font-bold">{predictionData.yes_ada} ADA</p>
+              <p className="text-2xl font-bold">{initialPrediction.yes_ada} ADA</p>
             </div>
-            <div className="bg-red-900 p-4 rounded">
+            <div className="bg-red-600 p-4 rounded">
               <h3 className="text-lg font-semibold mb-2">No</h3>
-              <p className="text-2xl font-bold">{predictionData.no_ada} ADA</p>
+              <p className="text-2xl font-bold">{initialPrediction.no_ada} ADA</p>
             </div>
           </div>
 
@@ -557,15 +556,15 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
                 />
                 <ShinyButton
                   text="Bet Yes"
-                  color="rgb(34, 197, 94)"
+                  color="rgb(22, 163, 74)"
                   onClick={() => handleBet('yes')}
-                  className="px-4 py-2 bg-green-500 rounded hover:bg-green-600"
+                  className="px-4 py-2 bg-green-600 rounded hover:bg-green-700"
                 />
                 <ShinyButton
                   text="Bet No"
-                  color="rgb(239, 68, 68)"
+                  color="rgb(220, 38, 38)"
                   onClick={() => handleBet('no')}
-                  className="px-4 py-2 bg-red-500 rounded hover:bg-red-600"
+                  className="px-4 py-2 bg-red-600 rounded hover:bg-red-700"
                 />
               </div>
             </div>
@@ -685,9 +684,9 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
         <div className="p-6 border-t border-gray-700">
           <ShinyButton
             text="Close"
-            color="rgb(239, 68, 68)"
+            color="rgb(220, 38, 38)"
             onClick={onClose}
-            className="px-4 py-2 bg-red-500 rounded hover:bg-red-600"
+            className="px-4 py-2 bg-red-600 rounded hover:bg-red-700"
           />
         </div>
       </div>

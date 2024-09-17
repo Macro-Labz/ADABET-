@@ -91,7 +91,7 @@ const Header: React.FC<HeaderProps> = ({ borderThickness = 2, onSearch, searchTe
   };
 
   return (
-    <header className="bg-[#000033] text-white relative">
+    <header className="bg-gradient-to-br from-gray-900 via-black to-gray-900 text-white relative">
       <div className="p-2 flex items-center justify-between">
         <div className="flex items-center w-full">
           <Link href="/" className="mr-4">
