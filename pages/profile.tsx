@@ -88,7 +88,6 @@ const ProfilePage: React.FC = () => {
         const data = await response.json();
         console.log('Fetched user bets:', data);
          
-        
         if (data.status === 'success' && Array.isArray(data.bets)) {
           setUserBets(data.bets);
           

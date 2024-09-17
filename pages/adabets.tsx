@@ -88,6 +88,7 @@ const AdaBetsPage: React.FC = () => {
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [, updateState] = useState({});
   const forceUpdate = useCallback(() => updateState({}), []);
+  const [showLatestBets, setShowLatestBets] = useState(false);
 
   useEffect(() => {
     fetchPredictions();
@@ -404,39 +405,41 @@ const AdaBetsPage: React.FC = () => {
         maxOpacity={0.3}
         duration={5}
       />
-      <div className="relative z-10 flex">
-        <div className="flex-grow">
-          <Header 
-            borderThickness={1} 
-            onSearch={handleSearch} 
-            searchTerm={searchTerm} 
-            setSearchTerm={setSearchTerm}
-          />
-          <div className="sticky top-0 z-10 bg-gradient-to-br from-gray-900 via-black to-gray-900 shadow-md">
-            <div className="flex justify-between items-center py-2 px-4 border-b border-gray-700">
-              <div className="flex overflow-x-auto space-x-2 items-center">
-                {['Top', 'New', 'Crypto Prices', 'Bitcoin', 'Airdrops', 'Ethereum', 'Memecoins', 'Stablecoins', 'Cardano', 'Opinion', 'Price'].map((tag) => (
-                  <button
-                    key={tag}
-                    className={`px-3 py-1 rounded-full whitespace-nowrap text-xs ${
-                      selectedTag === tag ? 'bg-blue-600' : 'bg-blue-500 hover:bg-blue-600'
-                    }`}
-                    onClick={() => handleTagSelect(tag)}
-                  >
-                    {tag}
-                  </button>
-                ))}
-                {(selectedTag || searchTerm) && (
-                  <button
-                    className="px-3 py-1 rounded-full whitespace-nowrap text-xs bg-red-500 hover:bg-red-600"
-                    onClick={() => {
-                      handleClearFilter();
-                    }}
-                  >
-                    Clear Filter
-                  </button>
-                )}
-              </div>
+      <div className="relative z-10">
+        <Header 
+          borderThickness={1} 
+          onSearch={handleSearch} 
+          searchTerm={searchTerm} 
+          setSearchTerm={setSearchTerm}
+        />
+        <div className="sticky top-0 z-20 bg-gradient-to-br from-gray-900 via-black to-gray-900 shadow-md">
+          <div className="flex justify-between items-center py-2 px-4 border-b border-gray-700">
+            <div className="flex overflow-x-auto space-x-2 items-center">
+              {['Top', 'New', 'Crypto Prices', 'Bitcoin', 'Airdrops', 'Ethereum', 'Memecoins', 'Stablecoins', 'Cardano', 'Opinion', 'Price'].map((tag) => (
+                <button
+                  key={tag}
+                  className={`px-4 py-2 rounded-full text-sm font-semibold text-white 
+                      bg-blue-600 hover:bg-blue-700 transition-colors duration-200
+                      border border-blue-400 shadow-lg
+                      ${selectedTag === tag ? 'bg-blue-700' : ''}
+                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50`}
+                  onClick={() => handleTagSelect(tag)}
+                >
+                  {tag}
+                </button>
+              ))}
+              {(selectedTag || searchTerm) && (
+                <button
+                  className="px-3 py-1 rounded-full whitespace-nowrap text-xs bg-red-500 hover:bg-red-600"
+                  onClick={() => {
+                    handleClearFilter();
+                  }}
+                >
+                  Clear Filter
+                </button>
+              )}
+            </div>
+            <div className="flex space-x-2">
               {router.pathname === '/adabets' && (
                 <ShinyButton
                   text="Create Bet"
@@ -449,192 +452,196 @@ const AdaBetsPage: React.FC = () => {
                   }`}
                 />
               )}
+              <ShinyButton
+                text="Latest Bets"
+                color="rgb(59, 130, 246)"
+                onClick={() => setShowLatestBets(!showLatestBets)}
+                className="px-4 py-2 rounded bg-blue-500 hover:bg-blue-600"
+              />
             </div>
           </div>
-          <div className="container mx-auto px-4 mt-4">
-            <h2 className="text-2xl font-bold mb-4">Active Predictions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-              {filteredActivePredictions.map((prediction) => {
-                const percentageChance = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
-                const progressColor = getProgressColor(percentageChance);
-                const timeToEnding = getTimeToEnding(prediction.end_date);
-                const daysLeft = differenceInDays(parseISO(prediction.end_date), new Date());
-                const isEnded = new Date(prediction.end_date) < new Date();
-                return (
-                  <div 
-                    key={prediction.id} 
-                    className={`
-                      bg-gradient-to-br from-gray-900 via-black to-gray-900
-                      rounded-lg p-4 hover:from-gray-800 hover:via-gray-900 hover:to-gray-800
-                      transition-colors cursor-pointer shadow-lg
-                      ${isEnded ? 'opacity-75' : ''} 
-                      ${prediction.id === newBetId ? 'animate-slide-in' : ''}
-                    `}
-                    onClick={() => handlePredictionClick(prediction)}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="w-3/4">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <h3 className="text-lg font-semibold">{prediction.title}</h3>
-                          <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-500 text-white">
-                            Active
-                          </span>
-                        </div>
-                        {prediction.tag && (
-                          <span className="inline-block bg-blue-500 text-xs font-semibold px-2 py-1 rounded-full mt-1">
-                            {prediction.tag}
-                          </span>
-                        )}
+        </div>
+        <div className="container mx-auto px-4 mt-4">
+          <h2 className="text-2xl font-bold mb-4">Active Predictions</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            {filteredActivePredictions.map((prediction) => {
+              const percentageChance = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
+              const progressColor = getProgressColor(percentageChance);
+              const timeToEnding = getTimeToEnding(prediction.end_date);
+              const daysLeft = differenceInDays(parseISO(prediction.end_date), new Date());
+              const isEnded = new Date(prediction.end_date) < new Date();
+              return (
+                <div 
+                  key={prediction.id} 
+                  className={`rounded-lg p-4 hover:bg-gray-700 transition-colors cursor-pointer ${isEnded ? 'opacity-75' : ''} ${prediction.id === newBetId ? 'animate-slide-in' : ''}
+                    bg-gradient-radial from-gray-800 via-gray-900 to-black border-2 border-blue-500`}
+                  onClick={() => handlePredictionClick(prediction)}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="w-3/4">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h3 className="text-lg font-semibold">{prediction.title}</h3>
+                        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-500 text-white">
+                          Active
+                        </span>
                       </div>
-                      <div className="w-1/4 max-w-[80px]">
-                        <CircularProgressbar
-                          value={percentageChance}
-                          text={`${percentageChance.toFixed(0)}%`}
-                          styles={buildStyles({
-                            textSize: '22px',
-                            pathColor: progressColor,
-                            textColor: 'white',
-                            trailColor: '#d6d6d6',
-                          })}
-                        />
-                      </div>
+                      {prediction.tag && (
+                        <span className="inline-block bg-blue-500 text-xs font-semibold px-2 py-1 rounded-full mt-1">
+                          {prediction.tag}
+                        </span>
+                      )}
                     </div>
-                    <p className="mb-2 text-sm text-gray-400">{prediction.content}</p>
-                    <div className="h-20 mb-2">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={generateChartData(prediction)}>
-                          <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} dot={false} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-green-500">Yes: {prediction.yes_ada.toFixed(2)} ADA</span>
-                      <span className="text-red-500">No: {prediction.no_ada.toFixed(2)} ADA</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Volume: {(prediction.yes_ada + prediction.no_ada).toFixed(2)} ADA</span>
-                      <span className={`${isEnded ? 'text-red-500 font-bold' : daysLeft <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
-                        {isEnded ? 'Ended' : timeToEnding}
-                      </span>
+                    <div className="w-1/4 max-w-[80px]">
+                      <CircularProgressbar
+                        value={percentageChance}
+                        text={`${percentageChance.toFixed(0)}%`}
+                        styles={buildStyles({
+                          textSize: '22px',
+                          pathColor: progressColor,
+                          textColor: 'white',
+                          trailColor: '#d6d6d6',
+                        })}
+                      />
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                  <p className="mb-2 text-sm text-gray-400">{prediction.content}</p>
+                  <div className="h-20 mb-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={generateChartData(prediction)}>
+                        <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-green-500">Yes: {prediction.yes_ada.toFixed(2)} ADA</span>
+                    <span className="text-red-500">No: {prediction.no_ada.toFixed(2)} ADA</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Volume: {(prediction.yes_ada + prediction.no_ada).toFixed(2)} ADA</span>
+                    <span className={`${isEnded ? 'text-red-500 font-bold' : daysLeft <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
+                      {isEnded ? 'Ended' : timeToEnding}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
 
-            <h2 className="text-2xl font-bold mb-4">Completed Predictions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredCompletedPredictions.map((prediction) => {
-                const percentageChance = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
-                const progressColor = getProgressColor(percentageChance);
-                const timeToEnding = getTimeToEnding(prediction.end_date);
-                const daysLeft = differenceInDays(parseISO(prediction.end_date), new Date());
-                const isEnded = new Date(prediction.end_date) < new Date();
-                return (
-                  <div 
-                    key={prediction.id} 
-                    className={`
-                      bg-gradient-to-br from-gray-900 via-black to-gray-900
-                      rounded-lg p-4 hover:from-gray-800 hover:via-gray-900 hover:to-gray-800
-                      transition-colors cursor-pointer shadow-lg
-                      ${isEnded ? 'opacity-75' : ''} 
-                      ${prediction.id === newBetId ? 'animate-slide-in' : ''}
-                    `}
-                    onClick={() => handlePredictionClick(prediction)}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="w-3/4">
-                        <div className="flex items-center space-x-2 mb-1">
-                          <h3 className="text-lg font-semibold">{prediction.title}</h3>
-                          <span className="text-xs font-semibold px-2 py-1 rounded-full bg-purple-500 text-white">
-                            Complete
-                          </span>
-                        </div>
-                        {prediction.tag && (
-                          <span className="inline-block bg-blue-500 text-xs font-semibold px-2 py-1 rounded-full mt-1">
-                            {prediction.tag}
-                          </span>
-                        )}
+          <h2 className="text-2xl font-bold mb-4">Completed Predictions</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredCompletedPredictions.map((prediction) => {
+              const percentageChance = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
+              const progressColor = getProgressColor(percentageChance);
+              const timeToEnding = getTimeToEnding(prediction.end_date);
+              const daysLeft = differenceInDays(parseISO(prediction.end_date), new Date());
+              const isEnded = new Date(prediction.end_date) < new Date();
+              return (
+                <div 
+                  key={prediction.id} 
+                  className={`rounded-lg p-4 hover:bg-gray-700 transition-colors cursor-pointer ${isEnded ? 'opacity-75' : ''} ${prediction.id === newBetId ? 'animate-slide-in' : ''}
+                    bg-gradient-radial from-gray-800 via-gray-900 to-black border-2 border-blue-500`}
+                  onClick={() => handlePredictionClick(prediction)}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="w-3/4">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <h3 className="text-lg font-semibold">{prediction.title}</h3>
+                        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-purple-500 text-white">
+                          Complete
+                        </span>
                       </div>
-                      <div className="w-1/4 max-w-[80px]">
-                        <CircularProgressbar
-                          value={percentageChance}
-                          text={`${percentageChance.toFixed(0)}%`}
-                          styles={buildStyles({
-                            textSize: '22px',
-                            pathColor: progressColor,
-                            textColor: 'white',
-                            trailColor: '#d6d6d6',
-                          })}
-                        />
-                      </div>
+                      {prediction.tag && (
+                        <span className="inline-block bg-blue-500 text-xs font-semibold px-2 py-1 rounded-full mt-1">
+                          {prediction.tag}
+                        </span>
+                      )}
                     </div>
-                    <p className="mb-2 text-sm text-gray-400">{prediction.content}</p>
-                    <div className="h-20 mb-2">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={generateChartData(prediction)}>
-                          <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} dot={false} />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-green-500">Yes: {prediction.yes_ada.toFixed(2)} ADA</span>
-                      <span className="text-red-500">No: {prediction.no_ada.toFixed(2)} ADA</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Volume: {(prediction.yes_ada + prediction.no_ada).toFixed(2)} ADA</span>
-                      <span className={`${isEnded ? 'text-red-500 font-bold' : daysLeft <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
-                        {isEnded ? 'Ended' : timeToEnding}
-                      </span>
+                    <div className="w-1/4 max-w-[80px]">
+                      <CircularProgressbar
+                        value={percentageChance}
+                        text={`${percentageChance.toFixed(0)}%`}
+                        styles={buildStyles({
+                          textSize: '22px',
+                          pathColor: progressColor,
+                          textColor: 'white',
+                          trailColor: '#d6d6d6',
+                        })}
+                      />
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                  <p className="mb-2 text-sm text-gray-400">{prediction.content}</p>
+                  <div className="h-20 mb-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={generateChartData(prediction)}>
+                        <Line type="monotone" dataKey="value" stroke="#8884d8" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span className="text-green-500">Yes: {prediction.yes_ada.toFixed(2)} ADA</span>
+                    <span className="text-red-500">No: {prediction.no_ada.toFixed(2)} ADA</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Volume: {(prediction.yes_ada + prediction.no_ada).toFixed(2)} ADA</span>
+                    <span className={`${isEnded ? 'text-red-500 font-bold' : daysLeft <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
+                      {isEnded ? 'Ended' : timeToEnding}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          {showPopup && <BetPopup onClose={() => setShowPopup(false)} />}
-          {showCreateForm && (
-            <CreatePredictionForm
-              onClose={() => setShowCreateForm(false)}
-              onSubmit={handleNewPrediction}
-            />
-          )}
-          {selectedPrediction && (
-            <PredictionDetails
-              prediction={selectedPrediction}
-              onClose={handleClosePredictionDetails}
-              //onBet={handleBet}
-              wallet={wallet}
-              connected={connected}
-            />
-          )}
         </div>
-        <div className="w-64 bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4 overflow-y-auto h-screen sticky top-0">
-          <h2 className="text-xl font-bold mb-4">Latest Bets</h2>
-          <AnimatedList delay={2000}>
-            {latestUserBets.map((bet) => (
-              <div 
-                key={bet.id} 
-                className={`p-2 rounded mb-2 ${
-                  bet.bet_type === 'yes' ? 'bg-green-800' : 'bg-red-800'
-                } hover:from-gray-800 hover:via-gray-900 hover:to-gray-800 transition-colors`}
-              >
-                <p className="text-sm font-semibold">{bet.prediction_title}</p>
-                {bet.prediction_tag && (
-                  <span className="inline-block bg-blue-500 text-xs font-semibold px-2 py-1 rounded-full mt-1 mb-1">
-                    {bet.prediction_tag}
-                  </span>
-                )}
-                <p className="text-xs text-gray-300">
-                  {bet.bet_type ? bet.bet_type.toUpperCase() : 'UNKNOWN'} - {bet.amount} ADA
-                </p>
-                <p className="text-xs text-gray-400">
-                  {new Date(bet.created_at).toLocaleString()}
-                </p>
-              </div>
-            ))}
-          </AnimatedList>
-        </div>
+        {showPopup && <BetPopup onClose={() => setShowPopup(false)} />}
+        {showCreateForm && (
+          <CreatePredictionForm
+            onClose={() => setShowCreateForm(false)}
+            onSubmit={handleNewPrediction}
+          />
+        )}
+        {selectedPrediction && (
+          <PredictionDetails
+            prediction={selectedPrediction}
+            onClose={handleClosePredictionDetails}
+            //onBet={handleBet}
+            wallet={wallet}
+            connected={connected}
+          />
+        )}
+        {showLatestBets && (
+          <div className="fixed right-0 top-[calc(64px+48px)] w-64 bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4 overflow-y-auto h-[calc(100vh-64px-48px)] z-10 border-l-2 border-blue-500">
+            <button 
+              onClick={() => setShowLatestBets(false)}
+              className="absolute top-2 right-2 text-white hover:text-gray-300"
+            >
+              ✕
+            </button>
+            <h2 className="text-xl font-bold mb-4">Latest Bets</h2>
+            <AnimatedList delay={2000}>
+              {latestUserBets.map((bet) => (
+                <div 
+                  key={bet.id} 
+                  className={`p-2 rounded mb-2 ${
+                    bet.bet_type === 'yes' ? 'bg-green-800' : 'bg-red-800'
+                  }`}
+                >
+                  <p className="text-sm font-semibold">{bet.prediction_title}</p>
+                  {bet.prediction_tag && (
+                    <span className="inline-block bg-blue-500 text-xs font-semibold px-2 py-1 rounded-full mt-1 mb-1">
+                      {bet.prediction_tag}
+                    </span>
+                  )}
+                  <p className="text-xs text-gray-300">
+                    {bet.bet_type ? bet.bet_type.toUpperCase() : 'UNKNOWN'} - {bet.amount} ADA
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {new Date(bet.created_at).toLocaleString()}
+                  </p>
+                </div>
+              ))}
+            </AnimatedList>
+          </div>
+        )}
       </div>
       <AnimatePresence>
         {notification && (

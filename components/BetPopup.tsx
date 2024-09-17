@@ -7,7 +7,7 @@ interface BetPopupProps {
 const BetPopup: React.FC<BetPopupProps> = ({ onClose }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-96">
+      <div className="bg-gradient-to-br from-gray-900 via-black to-gray-900 p-6 rounded-lg shadow-xl w-96 border-2 border-blue-500">
         <div className="flex justify-between mb-4">
           <div className="space-y-2">
             {['$1', '$5', '$10', '$50'].map((amount) => (

@@ -37,7 +37,6 @@ interface PredictionDetailsProps {
     created_at: string;
   };
   onClose: () => void;
-  //onBet: (predictionId: number, betType: 'yes' | 'no', amount: number) => void;
   wallet: any;
   connected: boolean;
 }
@@ -96,6 +95,8 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
     no_ada: initialPrediction.no_ada,
   });
 
+  const [isLoading, setIsLoading] = useState(true);
+
   const fetchLatestPredictionData = async () => {
     try {
       const response = await fetch(`/api/getLatestPredictionData?predictionId=${initialPrediction.id}`);
@@ -103,6 +104,22 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
       const data = await response.json();
       setPredictionData(data);
       setCurrentPercentage(calculatePercentageChance(data.yes_ada, data.no_ada));
+      
+      // Update chart data with the latest bet
+      if (data.latestBet) {
+        setChartData(prevData => [
+          ...prevData,
+          {
+            timestamp: new Date(data.latestBet.created_at).getTime(),
+            value: calculatePercentageChance(data.yes_ada, data.no_ada)
+          }
+        ]);
+      }
+      
+      // Update recent bets
+      if (data.recentBets) {
+        setRecentBets(data.recentBets);
+      }
     } catch (error) {
       console.error('Error fetching latest prediction data:', error);
     }
@@ -147,8 +164,14 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   }, [onClose]);
 
   useEffect(() => {
-    fetchPredictionHistory();
-    fetchRecentBets();
+    const fetchInitialData = async () => {
+      setIsLoading(true);
+      await fetchPredictionHistory();
+      await fetchRecentBets();
+      setIsLoading(false);
+    };
+
+    fetchInitialData();
 
     // Set up polling to update the chart and recent bets every 30 seconds
     const intervalId = setInterval(() => {
@@ -240,8 +263,9 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
       setBetAmount('');
       setNewBetId(data.data.id);
       setTimeout(() => setNewBetId(null), 5000); // Clear new bet highlight after 5 seconds
-      fetchRecentBets(); // Fetch recent bets after successful bet placement
-      fetchLatestPredictionData(); // Fetch latest prediction data
+      
+      // Fetch latest data immediately after placing a bet
+      await fetchLatestPredictionData();
     } catch (error) {
       console.error('Error placing bet:', error);
       alert('Failed to place bet. Please try again.');
@@ -383,8 +407,10 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   };
 
   const generateChartData = (bets: Bet[]) => {
+    console.log('Generating chart data from bets:', bets);
+
     if (bets.length === 0) {
-      // If no bets, return a flat line at 50%
+      console.log('No bets, returning flat line at 50%');
       return [
         { timestamp: new Date(initialPrediction.created_at).getTime(), value: 50 },
         { timestamp: new Date().getTime(), value: 50 }
@@ -393,6 +419,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
 
     // Sort bets by timestamp
     const sortedBets = [...bets].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    console.log('Sorted bets:', sortedBets);
 
     let yesTotal = 0;
     let noTotal = 0;
@@ -425,28 +452,6 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   }, [initialPrediction.bets]);
 
   useEffect(() => {
-    const updateChartData = () => {
-      const now = new Date();
-      const newDataPoint = {
-        timestamp: now.getTime(),
-        value: currentPercentage
-      };
-
-      setChartData(prevData => {
-        const newData = [...prevData, newDataPoint];
-        // Keep only the last 60 data points (1 hour of data)
-        return newData.slice(-60);
-      });
-    };
-
-    // Update chart data immediately and then every minute
-    updateChartData();
-    const intervalId = setInterval(updateChartData, 60000);
-
-    return () => clearInterval(intervalId);
-  }, [currentPercentage]);
-
-  useEffect(() => {
     const calculateCurrentPercentage = () => {
       const newPercentage = calculatePercentageChance(predictionData.yes_ada, predictionData.no_ada);
       console.log(`New percentage calculated: ${newPercentage}`);
@@ -460,68 +465,77 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
     return () => clearInterval(intervalId);
   }, [predictionData.yes_ada, predictionData.no_ada]);
 
+  const getPercentageColor = (percentage: number) => {
+    if (percentage > 50) return 'text-green-500';
+    if (percentage < 50) return 'text-red-500';
+    return 'text-yellow-500';
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <style>{styles}</style>
-      <div ref={detailsRef} className="bg-gradient-to-br from-gray-900 via-black to-gray-900 rounded-lg w-full max-w-4xl m-4 flex flex-col max-h-[90vh] shadow-lg">
-        <div className="p-6 overflow-y-auto flex-grow">
-          <div className="flex justify-between items-start mb-4">
-            <h2 className="text-2xl font-bold">{initialPrediction.title}</h2>
-            <div className="text-right">
-              <span className="text-3xl font-bold text-green-500">{currentPercentage.toFixed(2)}%</span>
-              <p className={`${differenceInDays(parseISO(initialPrediction.end_date), new Date()) <= 1 ? 'text-red-500 font-bold' : 'text-yellow-500'}`}>
-                {timeRemaining}
-              </p>
-            </div>
+      <div ref={detailsRef} className="bg-gradient-to-br from-gray-900 via-black to-gray-900 p-6 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border-2 border-blue-500 relative">
+        <button 
+          onClick={onClose}
+          className="absolute top-2 right-2 text-white hover:text-gray-300"
+        >
+          ✕
+        </button>
+        <div className={`absolute top-2 right-10 font-bold text-5xl ${getPercentageColor(currentPercentage)}`}>
+          {currentPercentage.toFixed(2)}%
+        </div>
+        <h2 className="text-2xl font-bold mb-4">{initialPrediction.title}</h2>
+        <p className="mb-4 text-gray-400">{initialPrediction.content}</p>
+        
+        {isLoading ? (
+          <div className="h-64 flex items-center justify-center">
+            <p>Loading chart data...</p>
           </div>
-          <p className="mb-4 text-gray-400">{initialPrediction.content}</p>
-          
-          <div className="mb-6 h-64">
+        ) : (
+          <div className="mb-6 h-64 border-2 border-blue-500 rounded-lg p-2">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart 
                 data={chartData} 
-                style={{ backgroundColor: 'black', border: '1px solid white' }}
                 margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
               >
                 <XAxis 
                   dataKey="timestamp" 
-                  tickFormatter={(tick) => format(new Date(tick), 'MM/dd HH:mm')}
+                  tickFormatter={(tick) => format(new Date(tick), 'HH:mm')}
                   type="number"
                   domain={['dataMin', 'dataMax']}
-                  tick={{ fill: 'white' }}
-                  axisLine={{ stroke: 'white' }}
+                  tick={{ fill: '#ffffff' }}
+                  axisLine={{ stroke: '#ffffff' }}
                 >
                   <Label 
                     value="Time" 
                     position="bottom" 
                     offset={10}
-                    style={{ fill: 'white' }}
+                    style={{ fill: '#ffffff' }}
                   />
                 </XAxis>
                 <YAxis 
                   domain={[0, 100]} 
                   allowDataOverflow={true}
-                  tick={{ fill: 'white' }}
-                  axisLine={{ stroke: 'white' }}
+                  tick={{ fill: '#ffffff' }}
+                  axisLine={{ stroke: '#ffffff' }}
                 >
                   <Label 
                     value="% Odds" 
                     angle={-90} 
                     position="insideLeft" 
-                    style={{ textAnchor: 'middle', fill: 'white' }}
+                    style={{ textAnchor: 'middle', fill: '#ffffff' }}
                   />
                 </YAxis>
                 <Tooltip 
-                  labelFormatter={(label) => format(new Date(label), 'yyyy-MM-dd HH:mm:ss')}
+                  labelFormatter={(label) => format(new Date(label), 'HH:mm:ss')}
                   formatter={(value: number) => [`${value.toFixed(2)}%`, 'Probability']}
-                  contentStyle={{ backgroundColor: 'black', border: '1px solid white', color: 'white' }}
-                  labelStyle={{ color: 'white' }}
+                  contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', color: '#ffffff' }}
+                  labelStyle={{ color: '#ffffff' }}
                 />
                 <ReferenceLine y={50} stroke="#3b82f6" strokeDasharray="3 3" />
                 <Line 
                   type="stepAfter"
                   dataKey="value" 
-                  stroke="#8b5cf6" // Change this line to use a purple color
+                  stroke="#8884d8" 
                   strokeWidth={2} 
                   dot={false}
                   isAnimationActive={false}
@@ -529,165 +543,156 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
               </LineChart>
             </ResponsiveContainer>
           </div>
-
-          <div className="grid grid-cols-2 gap-4 mb-6">
-            <div className="bg-green-600 p-4 rounded">
-              <h3 className="text-lg font-semibold mb-2">Yes</h3>
-              <p className="text-2xl font-bold">{initialPrediction.yes_ada} ADA</p>
-            </div>
-            <div className="bg-red-600 p-4 rounded">
-              <h3 className="text-lg font-semibold mb-2">No</h3>
-              <p className="text-2xl font-bold">{initialPrediction.no_ada} ADA</p>
-            </div>
+        )}
+        
+        <div className="flex justify-between mb-6">
+          <div className="w-1/2 p-4 rounded-lg bg-green-500 text-white mr-2">
+            <h3 className="text-lg font-semibold mb-2">Yes</h3>
+            <p className="text-2xl font-bold">{predictionData.yes_ada.toFixed(2)} ADA</p>
           </div>
-
-          {isEnded ? (
-            getBetSummary()
-          ) : connected ? (
-            <div className="mb-6">
-              <h3 className="text-xl font-semibold mb-2">Place Your Bet</h3>
-              <div className="flex items-center space-x-4">
-                <input
-                  type="number"
-                  value={betAmount}
-                  onChange={(e) => setBetAmount(e.target.value)}
-                  placeholder="Enter ADA amount"
-                  className="px-3 py-2 bg-gray-700 rounded flex-grow"
-                />
-                <ShinyButton
-                  text="Bet Yes"
-                  color="rgb(22, 163, 74)"
-                  onClick={() => handleBet('yes')}
-                  className="px-4 py-2 bg-green-600 rounded hover:bg-green-700"
-                />
-                <ShinyButton
-                  text="Bet No"
-                  color="rgb(220, 38, 38)"
-                  onClick={() => handleBet('no')}
-                  className="px-4 py-2 bg-red-600 rounded hover:bg-red-700"
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="mb-6">
-              <p className="text-yellow-500">Connect your wallet to place bets and comment.</p>
-            </div>
-          )}
-
-          <div className="mb-6">
-            <h3 className="text-xl font-semibold mb-2">Recent Bets</h3>
-            <ul className="space-y-2 max-h-40 overflow-y-auto">
-              {recentBets.length > 0 ? (
-                recentBets.map((bet) => (
-                  <li 
-                    key={bet.id} 
-                    className={`p-2 rounded ${
-                      bet.bet_type === 'yes' ? 'bg-green-800' : 'bg-red-800'
-                    } ${bet.id === newBetId ? 'new-bet-animation' : ''}`}
-                  >
-                    <span className="font-medium">
-                      {bet.user_wallet_address ? bet.user_wallet_address.slice(0, 8) + '...' : 'Anonymous'}
-                    </span>{' '}
-                    bet {bet.amount} ADA on {bet.bet_type} at {
-                      new Date(bet.created_at).toLocaleString()
-                    }
-                  </li>
-                ))
-              ) : (
-                <li className="bg-gray-700 p-2 rounded">No bets yet</li>
-              )}
-            </ul>
-          </div>
-
-          <div className="mb-6">
-            <h3 className="text-xl font-semibold mb-2">Comments</h3>
-            {connected ? (
-              <div className="mb-4">
-                <textarea
-                  value={commentContent}
-                  onChange={(e) => setCommentContent(e.target.value)}
-                  placeholder="Add a comment..."
-                  className="w-full px-3 py-2 bg-gray-700 rounded"
-                  rows={3}
-                />
-                <div className="flex items-center mt-2">
-                  <input
-                    type="text"
-                    value={memeUrl}
-                    onChange={(e) => setMemeUrl(e.target.value)}
-                    placeholder="Add a meme/gif URL (optional)"
-                    className="flex-grow px-3 py-2 bg-gray-700 rounded-l"
-                  />
-                  <ShinyButton
-                    text="📷 Memes"
-                    color="rgb(59, 130, 246)"
-                    onClick={() => setShowMemeSelector(!showMemeSelector)}
-                    className="px-4 py-2 bg-blue-500 rounded-r hover:bg-blue-600"
-                  />
-                </div>
-                {showMemeSelector && (
-                  <div className="mt-2 grid grid-cols-3 gap-2 max-h-40 overflow-y-auto">
-                    {memeOptions.map((meme, index) => (
-                      <img
-                        key={index}
-                        src={meme.url}
-                        alt={meme.alt}
-                        className="w-full h-24 object-cover cursor-pointer rounded"
-                        onClick={() => handleMemeSelect(meme.url)}
-                      />
-                    ))}
-                  </div>
-                )}
-                <ShinyButton
-                  text="Add Comment"
-                  color="rgb(59, 130, 246)"
-                  onClick={handleAddComment}
-                  className="mt-2 px-4 py-2 bg-blue-500 rounded hover:bg-blue-600"
-                />
-              </div>
-            ) : (
-              <p className="text-yellow-500 mb-4">Connect your wallet to add comments.</p>
-            )}
-            <ul className="space-y-4 max-h-60 overflow-y-auto">
-              {comments.map((comment) => {
-                const userVote = getUserVote(comment);
-                return (
-                  <li key={comment.id} className="bg-gray-700 p-4 rounded">
-                    <p className="font-semibold">{comment.user_wallet_address.slice(0, 8)}...</p>
-                    <p>{comment.content}</p>
-                    <p className="text-sm text-gray-400 mt-2">
-                      {new Date(comment.created_at).toLocaleString()}
-                    </p>
-                    {connected && (
-                      <div className="flex items-center space-x-2 mt-2">
-                        <button 
-                          className={`text-green-500 hover:text-green-400 ${userVote === 'up' ? 'font-bold' : ''}`}
-                          onClick={() => handleVote(comment.id, 'up')}
-                        >
-                          ▲ {comment.upvotes}
-                        </button>
-                        <button 
-                          className={`text-red-500 hover:text-red-400 ${userVote === 'down' ? 'font-bold' : ''}`}
-                          onClick={() => handleVote(comment.id, 'down')}
-                        >
-                          ▼ {comment.downvotes}
-                        </button>
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+          <div className="w-1/2 p-4 rounded-lg bg-red-500 text-white ml-2">
+            <h3 className="text-lg font-semibold mb-2">No</h3>
+            <p className="text-2xl font-bold">{predictionData.no_ada.toFixed(2)} ADA</p>
           </div>
         </div>
 
-        <div className="p-6 border-t border-gray-700">
-          <ShinyButton
-            text="Close"
-            color="rgb(220, 38, 38)"
-            onClick={onClose}
-            className="px-4 py-2 bg-red-600 rounded hover:bg-red-700"
-          />
+        {isEnded ? (
+          getBetSummary()
+        ) : connected ? (
+          <div className="mb-6">
+            <h3 className="text-xl font-semibold mb-2">Place Your Bet</h3>
+            <div className="flex items-center space-x-4">
+              <input
+                type="number"
+                value={betAmount}
+                onChange={(e) => setBetAmount(e.target.value)}
+                placeholder="Enter ADA amount"
+                className="px-3 py-2 bg-gray-700 rounded flex-grow"
+              />
+              <ShinyButton
+                text="Bet Yes"
+                color="rgb(34, 197, 94)"
+                onClick={() => handleBet('yes')}
+                className="px-4 py-2 bg-green-500 rounded hover:bg-green-600"
+              />
+              <ShinyButton
+                text="Bet No"
+                color="rgb(239, 68, 68)"
+                onClick={() => handleBet('no')}
+                className="px-4 py-2 bg-red-500 rounded hover:bg-red-600"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="mb-6">
+            <p className="text-yellow-500">Connect your wallet to place bets and comment.</p>
+          </div>
+        )}
+
+        <div className="mb-6">
+          <h3 className="text-xl font-semibold mb-2">Recent Bets</h3>
+          <ul className="space-y-2 max-h-40 overflow-y-auto">
+            {recentBets.length > 0 ? (
+              recentBets.map((bet) => (
+                <li 
+                  key={bet.id} 
+                  className={`p-2 rounded ${
+                    bet.bet_type === 'yes' ? 'bg-green-800' : 'bg-red-800'
+                  } ${bet.id === newBetId ? 'new-bet-animation' : ''}`}
+                >
+                  <span className="font-medium">
+                    {bet.user_wallet_address ? bet.user_wallet_address.slice(0, 8) + '...' : 'Anonymous'}
+                  </span>{' '}
+                  bet {bet.amount} ADA on {bet.bet_type} at {
+                    new Date(bet.created_at).toLocaleString()
+                  }
+                </li>
+              ))
+            ) : (
+              <li className="bg-gray-700 p-2 rounded">No bets yet</li>
+            )}
+          </ul>
+        </div>
+
+        <div className="mb-6">
+          <h3 className="text-xl font-semibold mb-2">Comments</h3>
+          {connected ? (
+            <div className="mb-4">
+              <textarea
+                value={commentContent}
+                onChange={(e) => setCommentContent(e.target.value)}
+                placeholder="Add a comment..."
+                className="w-full px-3 py-2 bg-gray-700 rounded"
+                rows={3}
+              />
+              <div className="flex items-center mt-2">
+                <input
+                  type="text"
+                  value={memeUrl}
+                  onChange={(e) => setMemeUrl(e.target.value)}
+                  placeholder="Add a meme/gif URL (optional)"
+                  className="flex-grow px-3 py-2 bg-gray-700 rounded-l"
+                />
+                <ShinyButton
+                  text="📷 Memes"
+                  color="rgb(59, 130, 246)"
+                  onClick={() => setShowMemeSelector(!showMemeSelector)}
+                  className="px-4 py-2 bg-blue-500 rounded-r hover:bg-blue-600"
+                />
+              </div>
+              {showMemeSelector && (
+                <div className="mt-2 grid grid-cols-3 gap-2 max-h-40 overflow-y-auto">
+                  {memeOptions.map((meme, index) => (
+                    <img
+                      key={index}
+                      src={meme.url}
+                      alt={meme.alt}
+                      className="w-full h-24 object-cover cursor-pointer rounded"
+                      onClick={() => handleMemeSelect(meme.url)}
+                    />
+                  ))}
+                </div>
+              )}
+              <ShinyButton
+                text="Add Comment"
+                color="rgb(59, 130, 246)"
+                onClick={handleAddComment}
+                className="mt-2 px-4 py-2 bg-blue-500 rounded hover:bg-blue-600"
+              />
+            </div>
+          ) : (
+            <p className="text-yellow-500 mb-4">Connect your wallet to add comments.</p>
+          )}
+          <ul className="space-y-4 max-h-60 overflow-y-auto">
+            {comments.map((comment) => {
+              const userVote = getUserVote(comment);
+              return (
+                <li key={comment.id} className="bg-gray-700 p-4 rounded">
+                  <p className="font-semibold">{comment.user_wallet_address.slice(0, 8)}...</p>
+                  <p>{comment.content}</p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    {new Date(comment.created_at).toLocaleString()}
+                  </p>
+                  {connected && (
+                    <div className="flex items-center space-x-2 mt-2">
+                      <button 
+                        className={`text-green-500 hover:text-green-400 ${userVote === 'up' ? 'font-bold' : ''}`}
+                        onClick={() => handleVote(comment.id, 'up')}
+                      >
+                        ▲ {comment.upvotes}
+                      </button>
+                      <button 
+                        className={`text-red-500 hover:text-red-400 ${userVote === 'down' ? 'font-bold' : ''}`}
+                        onClick={() => handleVote(comment.id, 'down')}
+                      >
+                        ▼ {comment.downvotes}
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       </div>
     </div>
