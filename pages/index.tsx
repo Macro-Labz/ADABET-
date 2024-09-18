@@ -3,16 +3,34 @@
 import React from 'react';
 import Image from "next/image";
 import Link from 'next/link';
-import { Inter, Roboto } from "next/font/google";
+import { Inter } from "next/font/google";
 import Head from "next/head";
 import Header from '../components/Header';
 import { GridPattern } from '../components/magicui/animated-grid-pattern';
-import BlurIn from '../components/magicui/blur-in';
-import ShineBorder from '../components/magicui/shine-border';
-import GridPatternBackground from '../components/magicui/GridPatternBackground';
+import { keyframes } from '@emotion/react';
+import styled from '@emotion/styled';
 
 const inter = Inter({ subsets: ["latin"] });
-const roboto = Roboto({ weight: '900', subsets: ["latin"] });
+
+const glow = keyframes`
+  0% {
+    text-shadow: 0 0 3px #3b82f6, 0 0 6px #3b82f6, 0 0 9px #3b82f6;
+  }
+  50% {
+    text-shadow: 0 0 6px #3b82f6, 0 0 12px #3b82f6, 0 0 18px #3b82f6;
+  }
+  100% {
+    text-shadow: 0 0 3px #3b82f6, 0 0 6px #3b82f6, 0 0 9px #3b82f6;
+  }
+`;
+
+const NeonText = styled.h1`
+  color: #fff;
+  font-size: 6rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  animation: ${glow} 2s ease-in-out infinite alternate;
+`;
 
 // This is the main page component for the application
 export default function HomePage() {
@@ -60,21 +78,19 @@ export default function HomePage() {
           {/* Add appropriate values for searchTerm and setSearchTerm */}
           
           <main className={`flex-grow flex flex-col items-center justify-center p-24 ${inter.className}`}>
-            <h1 className={`mb-8 ${roboto.className} cool-text`}>
+            <NeonText className="mb-8 text-center">
               Welcome to ADA BETS
-            </h1>
-            <ShineBorder borderWidth={2} color="#ffffff" className="mb-8 bg-white rounded-lg shadow-md w-full max-w-2xl">
-              <div className="p-8">
-                <p className="text-xl mb-6 text-black text-center">Your trusted platform for sports betting and predictions.</p>
-                <div className="flex justify-center">
-                  <Link href="/adabets">
-                    <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition duration-300 ease-in-out transform hover:scale-105">
-                      Get Started
-                    </button>
-                  </Link>
-                </div>
+            </NeonText>
+            <div className="bg-gradient-radial from-gray-800 via-gray-900 to-black p-8 rounded-lg border-2 border-blue-500 mb-8 shadow-md w-full max-w-2xl">
+              <p className="text-xl mb-6 text-white text-center">Your Trusted Platform for Market Price Prediction and Opinion Based Betting.</p>
+              <div className="flex justify-center">
+                <Link href="/adabets">
+                  <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition duration-300 ease-in-out transform hover:scale-105">
+                    Get Started
+                  </button>
+                </Link>
               </div>
-            </ShineBorder>
+            </div>
 
             <div className="flex justify-center space-x-8">
               <div className="flex flex-col items-center">

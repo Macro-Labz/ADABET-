@@ -415,7 +415,7 @@ const AdaBetsPage: React.FC = () => {
         <div className="sticky top-0 z-20 bg-gradient-to-br from-gray-900 via-black to-gray-900 shadow-md">
           <div className="flex justify-between items-center py-2 px-4 border-b border-gray-700">
             <div className="flex overflow-x-auto space-x-2 items-center">
-              {['Top', 'New', 'Crypto Prices', 'Bitcoin', 'Airdrops', 'Ethereum', 'Memecoins', 'Stablecoins', 'Cardano', 'Opinion', 'Price'].map((tag) => (
+              {['Top', 'New', 'Crypto Prices', 'Memecoins', 'Stablecoins', 'Cardano', 'Opinion', 'Price'].map((tag) => (
                 <button
                   key={tag}
                   className={`px-4 py-2 rounded-full text-sm font-semibold text-white 

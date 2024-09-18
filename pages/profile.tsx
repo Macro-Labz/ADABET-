@@ -3,9 +3,13 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { useWallet } from "@meshsdk/react";
-import Header from '../components/Header';
 import { GridPattern } from '../components/magicui/animated-grid-pattern';
 import Graph from '../components/Graph';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import Header from '../components/Header';
+import { keyframes } from '@emotion/react';
+import styled from '@emotion/styled';
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 
 interface Prediction {
   id: number;
@@ -28,6 +32,26 @@ interface Bet {
   transaction_id: string;
 }
 
+const glow = keyframes`
+  0% {
+    text-shadow: 0 0 3px #3b82f6, 0 0 6px #3b82f6, 0 0 9px #3b82f6;
+  }
+  50% {
+    text-shadow: 0 0 6px #3b82f6, 0 0 12px #3b82f6, 0 0 18px #3b82f6;
+  }
+  100% {
+    text-shadow: 0 0 3px #3b82f6, 0 0 6px #3b82f6, 0 0 9px #3b82f6;
+  }
+`;
+
+const NeonText = styled.h1`
+  color: #fff;
+  font-size: 2rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  animation: ${glow} 2s ease-in-out infinite alternate;
+`;
+
 const ProfilePage: React.FC = () => {
   const { connected, wallet } = useWallet();
   const router = useRouter();
@@ -39,6 +63,8 @@ const ProfilePage: React.FC = () => {
   const [userPredictions, setUserPredictions] = useState<Prediction[]>([]);
   const [userBets, setUserBets] = useState<Bet[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [betHistory, setBetHistory] = useState<{ date: string; profitLoss: number }[]>([]);
+  const [showValues, setShowValues] = useState(true);
 
   useEffect(() => {
     if (connected && wallet) {
@@ -98,11 +124,20 @@ const ProfilePage: React.FC = () => {
           setLosingBets(losingBets);
           setActiveBets(data.bets.length);
 
-          // Calculate lifetime profit/loss (this is a simplified calculation)
-          const profitLoss = data.bets.reduce((total: number, bet: Bet) => {
-            return total + (bet.bet_type === 'yes' ? bet.amount : -bet.amount);
-          }, 0);
-          setLifetimeProfitLoss(profitLoss);
+          // Calculate lifetime profit/loss and prepare graph data
+          let runningTotal = 0;
+          const graphData = data.bets
+            .sort((a: Bet, b: Bet) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+            .map((bet: Bet) => {
+              runningTotal += bet.bet_type === 'yes' ? bet.amount : -bet.amount;
+              return {
+                date: new Date(bet.created_at).toLocaleDateString(),
+                profitLoss: runningTotal
+              };
+            });
+
+          setLifetimeProfitLoss(runningTotal);
+          setBetHistory(graphData);
         } else {
           console.error('Unexpected data format:', data);
         }
@@ -127,6 +162,10 @@ const ProfilePage: React.FC = () => {
     return value >= 0 ? `+${formattedValue}` : `-${formattedValue}`;
   };
 
+  const toggleValueVisibility = () => {
+    setShowValues(!showValues);
+  };
+
   if (!connected) {
     return null;
   }
@@ -148,63 +187,80 @@ const ProfilePage: React.FC = () => {
             searchTerm={searchTerm} 
             setSearchTerm={setSearchTerm} 
           />
-          <h1 className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-2xl font-bold">
+          <NeonText className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
             - USER PROFILE -
-          </h1>
+          </NeonText>
         </div>
 
         {/* Portfolio Summary Boxes */}
-        <div className="bg-gray-900 p-4">
+        <div className="bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4 border-b border-gray-700" style={{ borderBottomWidth: '0.5px' }}>
           <div className="container mx-auto">
             <div className="grid grid-cols-7 gap-4 text-sm">
-              <div className="col-span-2 bg-gray-800 p-2 rounded">
-                <div className="font-bold">Total Portfolio Value</div>
-                <div className="text-blue-500 font-bold">{balance} ADA</div>
-              </div>
-              <div className="bg-gray-800 p-2 rounded">
-                <div>Active Bets:</div>
-                <div className="text-blue-500 font-bold">{activeBets}</div>
-              </div>
-              <div className="bg-gray-800 p-2 rounded">
-                <div>Wins:</div>
-                <div className="text-green-500 font-bold">{winningBets}</div>
-              </div>
-              <div className="bg-gray-800 p-2 rounded">
-                <div>Losses:</div>
-                <div className="text-red-500 font-bold">{losingBets}</div>
-              </div>
-              <div className="bg-gray-800 p-2 rounded">
-                <div>Win/Loss Ratio:</div>
-                {(() => {
-                  const { ratio, color } = calculateWinLossRatio();
-                  return <div className={`${color} font-bold`}>{ratio}</div>;
-                })()}
-              </div>
-              <div className="bg-gray-800 p-2 rounded">
-                <div>Lifetime Profit/Loss:</div>
-                <div className={`${lifetimeProfitLoss >= 0 ? 'text-green-500' : 'text-red-500'} font-bold`}>
-                  {formatProfitLoss(lifetimeProfitLoss)} ADA
+              {[
+                { label: "Total Portfolio Value", value: `${balance} ADA` },
+                { label: "Active Bets:", value: activeBets },
+                { label: "Wins:", value: winningBets, color: "text-green-500" },
+                { label: "Losses:", value: losingBets, color: "text-red-500" },
+                { label: "Win/Loss Ratio:", value: calculateWinLossRatio().ratio, color: calculateWinLossRatio().color },
+                { label: "Lifetime Profit/Loss:", value: `${formatProfitLoss(lifetimeProfitLoss)} ADA`, color: lifetimeProfitLoss >= 0 ? "text-green-500" : "text-red-500" },
+              ].map((item, index) => (
+                <div key={index} className={`${index === 0 ? "col-span-2" : ""} bg-gradient-radial from-gray-800 via-gray-900 to-black p-2 rounded-lg border-2 border-blue-500 relative`}>
+                  <div className="font-bold">{item.label}</div>
+                  <div className={`${item.color || "text-blue-500"} font-bold`}>
+                    {showValues ? item.value : '************'}
+                  </div>
+                  {index === 0 && (
+                    <button 
+                      onClick={toggleValueVisibility}
+                      className="absolute top-2 right-2 text-blue-500 hover:text-blue-400 transition-colors duration-200"
+                    >
+                      {showValues ? <FaEyeSlash size={20} /> : <FaEye size={20} />}
+                    </button>
+                  )}
                 </div>
-              </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Large Box */}
-        <div className="container mx-auto px-4 mt-8 flex justify-center">
-          <div className="w-[800px] h-[400px] bg-gray-900 rounded-lg shadow-lg p-4 flex items-center justify-center">
+        {/* Large Box for Graph */}
+        <div className="container mx-auto px-4 my-8 flex justify-center items-center flex-grow">
+          <div className="w-[900px] h-[460px] bg-gradient-radial from-gray-800 via-gray-900 to-black rounded-lg shadow-lg p-4 flex items-center justify-center border-2 border-blue-500">
             {/* Graph component */}
-            <div className="w-[100%] h-[102%]">
-              <Graph />
+            <div className="w-[95%] h-[95%] border border-gray-700 rounded">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={betHistory}>
+                  <CartesianGrid vertical={false} horizontal={false} />
+                  <XAxis 
+                    dataKey="date" 
+                    axisLine={{ stroke: 'white' }} 
+                    tickLine={false}
+                    tick={{ fill: 'white' }}
+                  />
+                  <YAxis 
+                    axisLine={{ stroke: 'white' }} 
+                    tickLine={false}
+                    tick={{ fill: 'white' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'rgba(0, 0, 0, 0.8)', border: 'none' }}
+                    labelStyle={{ color: 'white' }}
+                    itemStyle={{ color: 'white' }}
+                  />
+                  <Line type="monotone" dataKey="profitLoss" stroke="#8884d8" />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>
 
         {/* Betting History Box */}
-        <div className="w-full mt-8 flex-grow flex flex-col bg-gray-900">
-          <div className="container mx-auto px-4 py-4 flex flex-col h-[400px]">
-            <h2 className="text-xl font-bold mb-4">Betting History</h2>
-            <div className="overflow-y-auto flex-grow">
+        <div className="w-full flex flex-col bg-gradient-to-br from-gray-900 via-black to-gray-900">
+          <div className="container mx-auto px-4 py-4 flex flex-col">
+            <div className="bg-gradient-radial from-gray-800 via-gray-900 to-black p-4 rounded-lg border-2 border-blue-500 mb-4">
+              <h2 className="text-xl font-bold">Betting History</h2>
+            </div>
+            <div className="overflow-y-auto h-[300px] border-2 border-blue-500 rounded-lg">
               <table className="w-full">
                 <thead className="bg-black sticky top-0">
                   <tr>
@@ -239,11 +295,13 @@ const ProfilePage: React.FC = () => {
           </div>
         </div>
 
-        {/* User's Created Predictions */}
-        <div className="w-full mt-8 flex-grow flex flex-col bg-gray-900">
-          <div className="container mx-auto px-4 py-4 flex flex-col h-[400px]">
-            <h2 className="text-xl font-bold mb-4">Your Created Predictions</h2>
-            <div className="overflow-y-auto flex-grow">
+        {/* Your Created Predictions */}
+        <div className="w-full flex flex-col bg-gradient-to-br from-black via-gray-900 to-gray-900">
+          <div className="container mx-auto px-4 py-4 flex flex-col">
+            <div className="bg-gradient-radial from-gray-800 via-gray-900 to-black p-4 rounded-lg border-2 border-blue-500 mb-4">
+              <h2 className="text-xl font-bold">Your Created Predictions</h2>
+            </div>
+            <div className="overflow-y-auto h-[300px] border-2 border-blue-500 rounded-lg">
               <table className="w-full">
                 <thead className="bg-black sticky top-0">
                   <tr>
