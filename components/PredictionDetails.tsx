@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip, Label, Ref
 import ShinyButton from './magicui/shiny-button';
 import { differenceInDays, differenceInHours, differenceInMinutes, differenceInSeconds, parseISO, format, addMinutes } from 'date-fns';
 import { useInterval } from '../hooks/useInterval';
+import PredictionResultDetails from './PredictionResultDetails';
 
 interface Bet {
   id: number;
@@ -96,6 +97,7 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
   });
 
   const [isLoading, setIsLoading] = useState(true);
+  const [showResultDetails, setShowResultDetails] = useState(false);
 
   const fetchLatestPredictionData = async () => {
     try {
@@ -396,12 +398,20 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
     const yesPercentage = (predictionData.yes_ada / totalBets) * 100;
     const noPercentage = (predictionData.no_ada / totalBets) * 100;
     return (
-      <div className="bg-gray-700 p-4 rounded mb-4">
-        <h3 className="text-xl font-semibold mb-2">Bet Summary</h3>
-        <p>Total bets: {totalBets.toFixed(2)} ADA</p>
-        <p>Yes: {predictionData.yes_ada.toFixed(2)} ADA ({yesPercentage.toFixed(2)}%)</p>
-        <p>No: {predictionData.no_ada.toFixed(2)} ADA ({noPercentage.toFixed(2)}%)</p>
-        <p>Winner: {yesPercentage > noPercentage ? 'Yes' : 'No'}</p>
+      <div className="bg-gray-700 p-4 rounded mb-4 flex justify-between items-center">
+        <div>
+          <h3 className="text-xl font-semibold mb-2">Bet Summary</h3>
+          <p>Total bets: {totalBets.toFixed(2)} ADA</p>
+          <p>Yes: {predictionData.yes_ada.toFixed(2)} ADA ({yesPercentage.toFixed(2)}%)</p>
+          <p>No: {predictionData.no_ada.toFixed(2)} ADA ({noPercentage.toFixed(2)}%)</p>
+          <p>Winner: {yesPercentage > noPercentage ? 'Yes' : 'No'}</p>
+        </div>
+        <ShinyButton
+          text="Details"
+          color="rgb(59, 130, 246)"
+          onClick={() => setShowResultDetails(true)}
+          className="px-4 py-2 bg-blue-500 rounded hover:bg-blue-600"
+        />
       </div>
     );
   };
@@ -694,6 +704,13 @@ const PredictionDetails: React.FC<PredictionDetailsProps> = ({
             })}
           </ul>
         </div>
+        
+        {showResultDetails && (
+          <PredictionResultDetails
+            prediction={initialPrediction}
+            onClose={() => setShowResultDetails(false)}
+          />
+        )}
       </div>
     </div>
   );

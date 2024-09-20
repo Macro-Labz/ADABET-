@@ -260,7 +260,7 @@ const ProfilePage: React.FC = () => {
             <div className="bg-gradient-radial from-gray-800 via-gray-900 to-black p-4 rounded-lg border-2 border-blue-500 mb-4">
               <h2 className="text-xl font-bold">Betting History</h2>
             </div>
-            <div className="overflow-y-auto h-[300px] border-2 border-blue-500 rounded-lg">
+            <div className="overflow-y-auto h-[300px] border-2 border-blue-500 rounded-lg bg-black">
               <table className="w-full">
                 <thead className="bg-black sticky top-0">
                   <tr>
@@ -274,7 +274,7 @@ const ProfilePage: React.FC = () => {
                 <tbody>
                   {userBets.length > 0 ? (
                     userBets.map((bet) => (
-                      <tr key={bet.id} className="bg-black border-b border-gray-700">
+                      <tr key={bet.id} className="border-b border-gray-700">
                         <td className="py-2 px-4">{bet.predictions?.title || 'Unknown Prediction'}</td>
                         <td className="py-2 px-4 text-blue-500">{bet.amount} ADA</td>
                         <td className={`py-2 px-4 ${bet.bet_type === 'yes' ? 'text-green-500' : 'text-red-500'}`}>
@@ -301,7 +301,7 @@ const ProfilePage: React.FC = () => {
             <div className="bg-gradient-radial from-gray-800 via-gray-900 to-black p-4 rounded-lg border-2 border-blue-500 mb-4">
               <h2 className="text-xl font-bold">Your Created Predictions</h2>
             </div>
-            <div className="overflow-y-auto h-[300px] border-2 border-blue-500 rounded-lg">
+            <div className="overflow-y-auto h-[300px] border-2 border-blue-500 rounded-lg bg-black">
               <table className="w-full">
                 <thead className="bg-black sticky top-0">
                   <tr>
@@ -313,15 +313,21 @@ const ProfilePage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {userPredictions.map((prediction) => (
-                    <tr key={prediction.id} className="bg-black border-b border-gray-700">
-                      <td className="py-2 px-4">{prediction.title}</td>
-                      <td className="py-2 px-4 text-green-500">{prediction.yes_ada} ADA</td>
-                      <td className="py-2 px-4 text-red-500">{prediction.no_ada} ADA</td>
-                      <td className="py-2 px-4">{new Date(prediction.end_date).toLocaleDateString()}</td>
-                      <td className="py-2 px-4">{new Date(prediction.created_at).toLocaleString()}</td>
+                  {userPredictions.length > 0 ? (
+                    userPredictions.map((prediction) => (
+                      <tr key={prediction.id} className="border-b border-gray-700">
+                        <td className="py-2 px-4">{prediction.title}</td>
+                        <td className="py-2 px-4 text-green-500">{prediction.yes_ada} ADA</td>
+                        <td className="py-2 px-4 text-red-500">{prediction.no_ada} ADA</td>
+                        <td className="py-2 px-4">{new Date(prediction.end_date).toLocaleDateString()}</td>
+                        <td className="py-2 px-4">{new Date(prediction.created_at).toLocaleString()}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="py-4 text-center">No predictions created yet</td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>

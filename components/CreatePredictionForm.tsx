@@ -14,7 +14,7 @@ const CreatePredictionForm: React.FC<CreatePredictionFormProps> = ({ onClose, on
   const [tag, setTag] = useState('');
   const { wallet } = useWallet();
 
-  const tags = ['Opinion', 'Price'];
+  const tags = ['Opinion', 'Crypto Prices', 'Memecoins', 'Cardano'];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,43 +62,55 @@ const CreatePredictionForm: React.FC<CreatePredictionFormProps> = ({ onClose, on
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
-      <div className="bg-gray-800 p-6 rounded-lg w-96">
-        <h2 className="text-xl font-bold mb-4">Create New Prediction</h2>
+      <div className="bg-gradient-to-br from-gray-900 via-black to-gray-900 p-6 rounded-lg w-96 border-2 border-blue-500">
+        <h2 className="text-xl font-bold mb-4 text-white">Create New Prediction</h2>
         <form onSubmit={handleSubmit}>
           <input
             type="text"
             placeholder="Title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="w-full p-2 mb-2 bg-gray-700 rounded"
+            className="w-full p-2 mb-2 bg-black rounded border border-blue-500 text-white"
             required
           />
           <textarea
             placeholder="Content"
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            className="w-full p-2 mb-2 bg-gray-700 rounded"
+            className="w-full p-2 mb-2 bg-black rounded border border-blue-500 text-white"
             required
           />
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="w-full p-2 mb-2 bg-gray-700 rounded"
-            required
-          />
-          <input
-            type="time"
-            value={timeEnds}
-            onChange={(e) => setTimeEnds(e.target.value)}
-            className="w-full p-2 mb-2 bg-gray-700 rounded"
-            required
-          />
+          <div className="relative mb-2">
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full p-2 bg-black rounded border border-blue-500 text-white"
+              required
+              style={{colorScheme: 'dark'}}
+            />
+          </div>
+          <div className="relative mb-2">
+            <input
+              type="time"
+              value={timeEnds}
+              onChange={(e) => setTimeEnds(e.target.value)}
+              className="w-full p-2 bg-black rounded border border-blue-500 text-white"
+              required
+              style={{colorScheme: 'dark'}}
+            />
+          </div>
           <select
             value={tag}
             onChange={(e) => setTag(e.target.value)}
-            className="w-full p-2 mb-2 bg-gray-700 rounded"
+            className="w-full p-2 mb-2 bg-black rounded border border-blue-500 text-white appearance-none"
             required
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='white' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E")`,
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 0.7rem top 50%',
+              backgroundSize: '1.5em auto'
+            }}
           >
             <option value="">Select a tag</option>
             {tags.map((t) => (
@@ -111,13 +123,13 @@ const CreatePredictionForm: React.FC<CreatePredictionFormProps> = ({ onClose, on
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-600 rounded mr-2"
+              className="px-4 py-2 bg-gray-600 rounded mr-2 text-white hover:bg-gray-700"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-500 rounded"
+              className="px-4 py-2 bg-blue-500 rounded text-white hover:bg-blue-600"
             >
               Create
             </button>

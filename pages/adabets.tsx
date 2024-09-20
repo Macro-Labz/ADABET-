@@ -93,13 +93,11 @@ const AdaBetsPage: React.FC = () => {
   useEffect(() => {
     fetchPredictions();
     fetchLatestUserBets();
-
-    const intervalId = setInterval(() => {
-      fetchLatestUserBets();
-    }, 30000); // Fetch every 30 seconds
-
-    return () => clearInterval(intervalId);
   }, []);
+
+  useInterval(() => {
+    fetchLatestUserBets();
+  }, 30000); // Fetch every 30 seconds
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -136,7 +134,12 @@ const AdaBetsPage: React.FC = () => {
       }
       const data = await response.json();
       console.log('Latest user bets:', data.bets);
-      setLatestUserBets(data.bets);
+      setLatestUserBets(prevBets => {
+        const newBets = data.bets.filter((newBet: UserBet) => 
+          !prevBets.some(prevBet => prevBet.id === newBet.id)
+        );
+        return [...newBets, ...prevBets];
+      });
     } catch (error) {
       console.error('Error fetching latest bets:', error);
     }
@@ -366,6 +369,7 @@ const AdaBetsPage: React.FC = () => {
   };
 
   const handleTagSelect = (tag: string) => {
+    console.log('Tag selected:', tag);
     setSelectedTag(tag === selectedTag ? null : tag);
   };
 
@@ -377,22 +381,51 @@ const AdaBetsPage: React.FC = () => {
   const activePredictions = predictions.filter(prediction => new Date(prediction.end_date) > new Date());
   const completedPredictions = predictions.filter(prediction => new Date(prediction.end_date) <= new Date());
 
-  const filterPredictions = (preds: Prediction[]) => 
-    preds.filter(prediction =>
-      (selectedTag ? prediction.tag === selectedTag : true) &&
-      (prediction.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prediction.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (prediction.tag && prediction.tag.toLowerCase().includes(searchTerm.toLowerCase())))
-    ).sort((a, b) => {
-      if (selectedTag === 'Top') {
+  const filterPredictions = (preds: Prediction[]) => {
+    console.log('Filtering predictions. Selected tag:', selectedTag);
+    console.log('Number of predictions before filtering:', preds.length);
+    
+    const filtered = preds.filter(prediction => {
+      // If 'Top 10' or 'New' is selected, don't filter by tag
+      if (selectedTag === 'Top' || selectedTag === 'Top 10' || selectedTag === 'New') {
+        return true;
+      }
+      
+      // For other tags, filter as before
+      return (
+        (!selectedTag || prediction.tag === selectedTag) &&
+        (prediction.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+         prediction.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+         (prediction.tag && prediction.tag.toLowerCase().includes(searchTerm.toLowerCase())))
+      );
+    });
+    
+    console.log('Number of predictions after filtering:', filtered.length);
+    console.log('Filtered predictions:', filtered.map(p => ({ id: p.id, tag: p.tag })));
+    
+    const sorted = filtered.sort((a, b) => {
+      if (selectedTag === 'Top' || selectedTag === 'Top 10') {
         return (b.yes_ada + b.no_ada) - (a.yes_ada + a.no_ada);
       } else if (selectedTag === 'New') {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       }
       return 0;
     });
+    
+    console.log('Sorted predictions:', sorted.map(p => ({ id: p.id, volume: p.yes_ada + p.no_ada, created_at: p.created_at })));
+    
+    return sorted;
+  };
 
   const filteredActivePredictions = filterPredictions(activePredictions);
+  const topActivePredictions = (selectedTag === 'Top' || selectedTag === 'Top 10') 
+    ? filteredActivePredictions.slice(0, 10) 
+    : selectedTag === 'New'
+    ? filteredActivePredictions.slice(0, 24)
+    : filteredActivePredictions;
+  
+  console.log('Final topActivePredictions:', topActivePredictions.map(p => ({ id: p.id, volume: p.yes_ada + p.no_ada, created_at: p.created_at })));
+
   const filteredCompletedPredictions = filterPredictions(completedPredictions);
 
   return (
@@ -412,18 +445,18 @@ const AdaBetsPage: React.FC = () => {
           searchTerm={searchTerm} 
           setSearchTerm={setSearchTerm}
         />
-        <div className="sticky top-0 z-20 bg-gradient-to-br from-gray-900 via-black to-gray-900 shadow-md">
+        <div className="sticky top-0 z-40 bg-gradient-to-br from-gray-900 via-black to-gray-900 shadow-md">
           <div className="flex justify-between items-center py-2 px-4 border-b border-gray-700">
             <div className="flex overflow-x-auto space-x-2 items-center">
-              {['Top', 'New', 'Crypto Prices', 'Memecoins', 'Stablecoins', 'Cardano', 'Opinion', 'Price'].map((tag) => (
+              {['Top 10', 'New', 'Memecoins', 'Cardano', 'Opinion', 'Crypto Prices'].map((tag) => (
                 <button
                   key={tag}
                   className={`px-4 py-2 rounded-full text-sm font-semibold text-white 
                       bg-blue-600 hover:bg-blue-700 transition-colors duration-200
                       border border-blue-400 shadow-lg
-                      ${selectedTag === tag ? 'bg-blue-700' : ''}
+                      ${selectedTag === (tag === 'Top 10' ? 'Top' : tag) ? 'bg-blue-700' : ''}
                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50`}
-                  onClick={() => handleTagSelect(tag)}
+                  onClick={() => handleTagSelect(tag === 'Top 10' ? 'Top' : tag)}
                 >
                   {tag}
                 </button>
@@ -460,11 +493,45 @@ const AdaBetsPage: React.FC = () => {
               />
             </div>
           </div>
+          {showLatestBets && (
+            <div className="absolute right-0 top-full w-64 bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4 overflow-y-auto max-h-[calc(100vh-100%)] z-30 border-l-2 border-b-2 border-blue-500">
+              <button 
+                onClick={() => setShowLatestBets(false)}
+                className="absolute top-2 right-2 text-white hover:text-gray-300"
+              >
+                ✕
+              </button>
+              <h2 className="text-xl font-bold mb-4">Latest Bets</h2>
+              <AnimatedList delay={2000}>
+                {latestUserBets.map((bet) => (
+                  <div 
+                    key={bet.id} 
+                    className={`p-2 rounded mb-2 ${
+                      bet.bet_type === 'yes' ? 'bg-green-800' : 'bg-red-800'
+                    }`}
+                  >
+                    <p className="text-sm font-semibold">{bet.prediction_title}</p>
+                    {bet.prediction_tag && (
+                      <span className="inline-block bg-blue-500 text-xs font-semibold px-2 py-1 rounded-full mt-1 mb-1">
+                        {bet.prediction_tag}
+                      </span>
+                    )}
+                    <p className="text-xs text-gray-300">
+                      {bet.bet_type ? bet.bet_type.toUpperCase() : 'UNKNOWN'} - {bet.amount} ADA
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {new Date(bet.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </AnimatedList>
+            </div>
+          )}
         </div>
         <div className="container mx-auto px-4 mt-4">
           <h2 className="text-2xl font-bold mb-4">Active Predictions</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-            {filteredActivePredictions.map((prediction) => {
+            {topActivePredictions.map((prediction) => {
               const percentageChance = calculatePercentageChance(prediction.yes_ada, prediction.no_ada);
               const progressColor = getProgressColor(percentageChance);
               const timeToEnding = getTimeToEnding(prediction.end_date);
@@ -607,40 +674,6 @@ const AdaBetsPage: React.FC = () => {
             wallet={wallet}
             connected={connected}
           />
-        )}
-        {showLatestBets && (
-          <div className="fixed right-0 top-[calc(64px+48px)] w-64 bg-gradient-to-br from-gray-900 via-black to-gray-900 p-4 overflow-y-auto h-[calc(100vh-64px-48px)] z-10 border-l-2 border-blue-500">
-            <button 
-              onClick={() => setShowLatestBets(false)}
-              className="absolute top-2 right-2 text-white hover:text-gray-300"
-            >
-              ✕
-            </button>
-            <h2 className="text-xl font-bold mb-4">Latest Bets</h2>
-            <AnimatedList delay={2000}>
-              {latestUserBets.map((bet) => (
-                <div 
-                  key={bet.id} 
-                  className={`p-2 rounded mb-2 ${
-                    bet.bet_type === 'yes' ? 'bg-green-800' : 'bg-red-800'
-                  }`}
-                >
-                  <p className="text-sm font-semibold">{bet.prediction_title}</p>
-                  {bet.prediction_tag && (
-                    <span className="inline-block bg-blue-500 text-xs font-semibold px-2 py-1 rounded-full mt-1 mb-1">
-                      {bet.prediction_tag}
-                    </span>
-                  )}
-                  <p className="text-xs text-gray-300">
-                    {bet.bet_type ? bet.bet_type.toUpperCase() : 'UNKNOWN'} - {bet.amount} ADA
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    {new Date(bet.created_at).toLocaleString()}
-                  </p>
-                </div>
-              ))}
-            </AnimatedList>
-          </div>
         )}
       </div>
       <AnimatePresence>

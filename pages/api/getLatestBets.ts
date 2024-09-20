@@ -30,8 +30,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       const formattedBets = bets.map(bet => ({
         ...bet,
-        prediction_title: bet.predictions.title,
-        prediction_tag: bet.predictions.tag
+        prediction_title: bet.predictions[0]?.title,
+        prediction_tag: bet.predictions[0]?.tag
       }));
 
       res.status(200).json({ bets: formattedBets });
